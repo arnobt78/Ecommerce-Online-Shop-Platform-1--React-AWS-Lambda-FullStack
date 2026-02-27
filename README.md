@@ -2,6 +2,11 @@
 
 CodeBook is a modern, full-stack e-commerce platform built with React and AWS serverless architecture for selling computer science eBooks. It features a complete customer storefront with product browsing, shopping cart, Stripe payment integration, order management, and reviews, plus a comprehensive admin dashboard for managing products, orders, users, analytics, and support tickets. The platform uses AWS Lambda, API Gateway, and DynamoDB for scalable serverless backend operations, integrates Cloudinary for images, Brevo for emails, and Shippo for shipping labels, and implements JWT-based authentication with role-based access control. Built with production-ready patterns, responsive Tailwind CSS design, and modern React practices including React Query, CodeBook serves as both a functional e-commerce solution and an educational resource demonstrating real-world full-stack development.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-18.3.1-blue)](https://react.dev/)
+[![AWS](https://img.shields.io/badge/AWS-Lambda-orange)](https://aws.amazon.com/lambda/)
+
 - **Live-Demo:** [https://codebook-aws.vercel.app/](https://codebook-aws.vercel.app/)
 
 ![Screenshot 2025-12-09 at 16 18 19](https://github.com/user-attachments/assets/a09c1f37-b5fc-43eb-9b40-f762d8b1af41)
@@ -391,13 +396,11 @@ npm test
 ### Frontend Deployment (Vercel)
 
 1. **Connect Repository to Vercel**
-
    - Go to [vercel.com](https://vercel.com)
    - Import your GitHub repository
    - Set root directory to `codebook`
 
 2. **Configure Environment Variables**
-
    - Add all `REACT_APP_*` variables in Vercel dashboard
    - Use production URLs for `REACT_APP_BASE_URL` and `REACT_APP_LAMBDA_API_URL`
 
@@ -421,7 +424,6 @@ cd codebook/aws-lambda
 ### 📚 Detailed Documentation
 
 - **[Frontend Documentation](./codebook/README.md)** - Complete React app documentation
-
   - Component guide
   - Hooks reference
   - API services
@@ -486,14 +488,12 @@ cd codebook/aws-lambda
 ### State Management Strategy
 
 1. **Server State**: TanStack React Query
-
    - API data fetching
    - Caching with `staleTime: Infinity`
    - Automatic cache invalidation
    - Optimistic updates
 
 2. **Client State**: React Context + useReducer
-
    - Cart state (`CartContext`)
    - Filter state (`FilterContext`)
    - Loading state (`LoadingContext`)

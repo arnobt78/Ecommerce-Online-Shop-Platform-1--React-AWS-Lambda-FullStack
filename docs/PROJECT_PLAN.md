@@ -250,11 +250,11 @@ Requested alongside the migration. Not present in the original AWS backend — t
 
 ## 10. Next step
 
-Gate 1 review: confirm the REQ-1200..1505 set above (or tell me what to change), then implementation starts with Phase 1, step 1.
+~~Gate 1 review: confirm the REQ-1200..1505 set above, then implementation starts with Phase 1, step 1.~~ Superseded — that Gate 1 review happened long ago and Phases 1–7 (REQ-1200 to REQ-1635) are all done, see §11. The only remaining step is deployment (Dockerfile + Coolify, REQ-1210/1211/1212), intentionally on hold at the user's request — everything else ships and runs locally.
 
 ---
 
-## 11. Status as of 2026-07-30 — what's actually done vs. not
+## 11. Status as of 2026-08-01 — what's actually done vs. not
 
 Phase 1 (backend migration) is **built and locally verified** but **not deployed** — see `.agile-v/STATE.md` for the authoritative, continuously-updated status. Summary:
 
@@ -265,9 +265,9 @@ Phase 1 (backend migration) is **built and locally verified** but **not deployed
 - react-toastify → shadcn Sonner (dynamic per-message titles), AlertDialog confirmation on all destructive admin actions, testimonials/FAQ content rewritten.
 - UI/UX pass (this entry): Framer Motion stagger reveal on Login/Register, per-route page-enter animation, `RippleButton` on primary CTAs, gradient/icon/badge KPI cards (`AdminMetricsCard`, matching `docs/UI_STYLING_GUIDE.md`'s card system) on the Dashboard and Analytics summary rows, rotating Ken-Burns hero background (`docs/HERO_ROTATING_BACKGROUND_SPEC.md`, React-ported), and clickable sky-colored product/order/user links replacing plain text in the Orders, Products, and Reviews admin tables.
 
-**Not started / explicitly deferred (with why):**
+**Not started / explicitly deferred (with why):** only one real item remains — everything else below this point is historical trace, already closed out (kept for traceability, not because it's still pending).
 
-- **Coolify/VPS deployment (REQ-1201/1210/1211/1212)** — deferred by direct user request; everything above only runs on localhost so far.
+- **Coolify/VPS deployment (REQ-1201/1210/1211/1212)** — deferred by direct user request; everything above only runs on localhost so far. This is the only genuinely open item in the whole plan.
 - ~~Full Lucide icon migration across every title/label/button/filter~~ — **done (REQ-1605)**, see §6 item 5.
 - ~~TanStack Table migration with dropdown row actions~~ — **done (REQ-1611)**, see §6 item 11.
 - ~~Auto-generate + attach + email an invoice PDF on successful order~~ — **done (REQ-1612)**, see §6 item 8.

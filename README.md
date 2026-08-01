@@ -1,824 +1,615 @@
-# CodeBook | E-Commerce Platform 1 - React, AWS (Lambda, DynamoDB, S3, HTTP API Gateway) Serverless Architecture FullStack Project (including Admin Panel with Product Management, Analytics, User Management, Order Processing, Review Moderation, Activity Logging)
+# CodeBook | E-Commerce Platform 1 – React, Vite, TypeScript, Express & PostgreSQL Full-Stack Project (including Storefront + Admin Dashboard + Role-Based Access Control + AI Business Insights)
 
-CodeBook is a modern, full-stack e-commerce platform built with React and AWS serverless architecture for selling computer science eBooks. It features a complete customer storefront with product browsing, shopping cart, Stripe payment integration, order management, and reviews, plus a comprehensive admin dashboard for managing products, orders, users, analytics, and support tickets. The platform uses AWS Lambda, API Gateway, and DynamoDB for scalable serverless backend operations, integrates Cloudinary for images, Brevo for emails, and Shippo for shipping labels, and implements JWT-based authentication with role-based access control. Built with production-ready patterns, responsive Tailwind CSS design, and modern React practices including React Query, CodeBook serves as both a functional e-commerce solution and an educational resource demonstrating real-world full-stack development.
+A modern, full-stack e-commerce platform for selling **computer science eBooks**. It includes a complete customer storefront (catalog, cart, Stripe checkout, address book, orders, reviews, support tickets) and a full **admin console** (products, orders, users, analytics, AI business insights, review moderation, tickets, activity log). The live API is an **Express + Prisma + PostgreSQL** backend in `backend/` (migrating away from the retired AWS Lambda + DynamoDB stack kept in `aws-lambda/` for reference). The frontend is a **React 19 + Vite + TypeScript** SPA with TanStack Query, Tailwind CSS, and JWT/Google OAuth auth.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-18.3.1-blue)](https://react.dev/)
-[![AWS](https://img.shields.io/badge/AWS-Lambda-orange)](https://aws.amazon.com/lambda/)
+[![React](https://img.shields.io/badge/React-19.2-blue)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF)](https://vitejs.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+[![Express](https://img.shields.io/badge/Express-4-black)](https://expressjs.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-PostgreSQL-2D3748)](https://www.prisma.io/)
+[![TanStack Query](https://img.shields.io/badge/TanStack_Query-5-FF4154)](https://tanstack.com/query)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-38B2AC)](https://tailwindcss.com/)
+[![Stripe](https://img.shields.io/badge/Stripe-Payments-635BFF)](https://stripe.com/)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-red)](./SECURITY.md)
+[![launch with diploi badge](https://diploi.com/launch.svg)](https://diploi.com/launch/arnobt78/Ecommerce-Shop-1-BookStore--React-FullStack)
 
-- **Live-Demo:** [https://codebook-aws.vercel.app/](https://codebook-aws.vercel.app/)
+- **Live demo (legacy AWS-backed showcase):** [https://codebook-aws.vercel.app/](https://codebook-aws.vercel.app/)
+- **Security:** private vulnerability reports → see [SECURITY.md](./SECURITY.md) · [contact@arnobmahmud.com](mailto:contact@arnobmahmud.com)
+- **Author:** [Arnob Mahmud](https://www.arnobmahmud.com) · [GitHub @arnobt78](https://github.com/arnobt78)
 
-![Screenshot 2025-12-09 at 16 18 19](https://github.com/user-attachments/assets/a09c1f37-b5fc-43eb-9b40-f762d8b1af41)
-![Screenshot 2025-12-09 at 16 19 01](https://github.com/user-attachments/assets/9084a2fd-2bf0-48ae-b0c1-0dddb6babaa4)
-![Screenshot 2025-12-09 at 16 19 32](https://github.com/user-attachments/assets/538e291b-90d5-4bf1-835a-310df4bf764d)
-![Screenshot 2025-12-09 at 16 19 52](https://github.com/user-attachments/assets/9700ff53-0d21-4fd6-93b3-fc2ca763ac9b)
-![Screenshot 2025-12-09 at 16 20 20](https://github.com/user-attachments/assets/7c9cb84e-26bd-4388-9cbd-45fd7edc9c2e)
-![Screenshot 2025-12-09 at 16 20 43](https://github.com/user-attachments/assets/071221f2-9229-4a8b-96da-7a2f0d7e1bce)
-![Screenshot 2025-12-09 at 16 21 13](https://github.com/user-attachments/assets/50382c4b-8aa0-4c9a-b878-d44143708628)
-![Screenshot 2025-12-09 at 16 21 29](https://github.com/user-attachments/assets/4ae29513-b8b3-4855-a29d-988ca3c252a6)
-![Screenshot 2025-12-09 at 16 21 42](https://github.com/user-attachments/assets/e079a69f-e64e-48d8-8840-cbfd11fbc60a)
-![Screenshot 2025-12-09 at 16 22 00](https://github.com/user-attachments/assets/bfa2c32a-ec77-486b-aa9a-d272a2735898)
-![Screenshot 2025-12-09 at 16 22 10](https://github.com/user-attachments/assets/afad029d-816c-4574-a3bd-a622f1d0e822)
-![Screenshot 2025-12-09 at 16 22 23](https://github.com/user-attachments/assets/8c4b16e3-cf38-47e5-8d90-e5201199830d)
-![Screenshot 2025-12-09 at 16 23 13](https://github.com/user-attachments/assets/449c8d9e-532f-4a3f-bf32-ee70fc729cad)
-![Screenshot 2025-12-09 at 16 23 34](https://github.com/user-attachments/assets/7c4715bd-adc3-4082-a0f9-27f793d1f219)
-![Screenshot 2025-12-09 at 16 23 59](https://github.com/user-attachments/assets/08826a4c-f40b-434a-bff7-5032253f6ef3)
-![Screenshot 2025-12-09 at 16 24 16](https://github.com/user-attachments/assets/1da1869d-d69d-44b6-8521-61f3d9faaf95)
-![Screenshot 2025-12-09 at 16 24 29](https://github.com/user-attachments/assets/b0bc9f98-de12-4d5f-95f1-f642c1d5e890)
-![Screenshot 2025-12-09 at 16 24 51](https://github.com/user-attachments/assets/b16256c1-01c7-409a-89bc-6b3f58abaa19)
-![Screenshot 2025-12-09 at 16 25 00](https://github.com/user-attachments/assets/4cfb857f-c346-455d-a067-aa1464f520bb)
-![Screenshot 2025-12-09 at 16 25 10](https://github.com/user-attachments/assets/7bfcdb50-cb3c-47b8-88dd-cc456052abef)
+> **Migration status (important for learners):** we are moving off AWS Lambda/DynamoDB to the Express API in `backend/`. That new backend is **not deployed to a public server yet**, and the **Vercel frontend is not cut over** to it. Local development uses Vite + `backend/` + Postgres. The public demo URL above still runs the older AWS-backed stack until Coolify/VPS + Vercel cutover is completed.
+
+![Screenshot](https://github.com/user-attachments/assets/a09c1f37-b5fc-43eb-9b40-f762d8b1af41)
+![Screenshot](https://github.com/user-attachments/assets/9084a2fd-2bf0-48ae-b0c1-0dddb6babaa4)
+![Screenshot](https://github.com/user-attachments/assets/538e291b-90d5-4bf1-835a-310df4bf764d)
+![Screenshot](https://github.com/user-attachments/assets/9700ff53-0d21-4fd6-93b3-fc2ca763ac9b)
+![Screenshot](https://github.com/user-attachments/assets/7c9cb84e-26bd-4388-9cbd-45fd7edc9c2e)
+![Screenshot](https://github.com/user-attachments/assets/071221f2-9229-4a8b-96da-7a2f0d7e1bce)
+![Screenshot](https://github.com/user-attachments/assets/50382c4b-8aa0-4c9a-b878-d44143708628)
+![Screenshot](https://github.com/user-attachments/assets/4ae29513-b8b3-4855-a29d-988ca3c252a6)
+![Screenshot](https://github.com/user-attachments/assets/e079a69f-e64e-48d8-8840-cbfd11fbc60a)
+![Screenshot](https://github.com/user-attachments/assets/bfa2c32a-ec77-486b-aa9a-d272a2735898)
+![Screenshot](https://github.com/user-attachments/assets/afad029d-816c-4574-a3bd-a622f1d0e822)
+![Screenshot](https://github.com/user-attachments/assets/8c4b16e3-cf38-47e5-8d90-e5201199830d)
+![Screenshot](https://github.com/user-attachments/assets/449c8d9e-532f-4a3f-bf32-ee70fc729cad)
+![Screenshot](https://github.com/user-attachments/assets/7c4715bd-adc3-4082-a0f9-27f793d1f219)
+![Screenshot](https://github.com/user-attachments/assets/08826a4c-f40b-434a-bff7-5032253f6ef3)
+![Screenshot](https://github.com/user-attachments/assets/1da1869d-d69d-44b6-8521-61f3d9faaf95)
+![Screenshot](https://github.com/user-attachments/assets/b0bc9f98-de12-4d5f-95f1-f642c1d5e890)
+![Screenshot](https://github.com/user-attachments/assets/b16256c1-01c7-409a-89bc-6b3f58abaa19)
+![Screenshot](https://github.com/user-attachments/assets/4cfb857f-c346-455d-a067-aa1464f520bb)
+![Screenshot](https://github.com/user-attachments/assets/7bfcdb50-cb3c-47b8-88dd-cc456052abef)
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 1. [Project Overview](#project-overview)
 2. [Architecture Overview](#architecture-overview)
 3. [Key Features](#key-features)
 4. [Technology Stack](#technology-stack)
 5. [Project Structure](#project-structure)
-6. [Quick Start Guide](#quick-start-guide)
+6. [Prerequisites](#prerequisites)
 7. [Environment Variables](#environment-variables)
-8. [Installation & Setup](#installation--setup)
-9. [Running the Project](#running-the-project)
-10. [Deployment](#deployment)
-11. [Documentation Links](#documentation-links)
-12. [Project Architecture](#project-architecture)
-13. [API Endpoints](#api-endpoints)
-14. [Component Reusability](#component-reusability)
-15. [Code Examples](#code-examples)
-16. [Keywords](#keywords)
-17. [Contributing](#contributing)
-18. [Conclusion](#conclusion)
+8. [Installation & Local Run](#installation--local-run)
+9. [Demo Accounts](#demo-accounts)
+10. [Frontend Routes](#frontend-routes)
+11. [Backend API Endpoints](#backend-api-endpoints)
+12. [How Core Pieces Work (Learner Guide)](#how-core-pieces-work-learner-guide)
+13. [Reusable Components & Patterns](#reusable-components--patterns)
+14. [Libraries & Dependencies (Short Lessons)](#libraries--dependencies-short-lessons)
+15. [Optional: Launch with Diploi](#optional-launch-with-diploi)
+16. [Documentation Links](#documentation-links)
+17. [Keywords](#keywords)
+18. [Security](#security)
+19. [Contributing](#contributing)
+20. [Conclusion](#conclusion)
+21. [License](#license)
 
 ---
 
 ## Project Overview
 
-**CodeBook** is a modern, full-stack e-commerce platform built with React and AWS serverless architecture. It demonstrates production-level patterns for building scalable web applications with authentication, payment processing, admin dashboards, analytics, and comprehensive order management.
+**CodeBook** teaches real e-commerce patterns in a single readable codebase:
 
-### What Makes This Project Special?
+- Customer journey: browse → filter → cart → Stripe pay → order history / digital library
+- Admin journey: inventory, orders, refunds/labels, users, reviews, tickets, analytics + AI insights
+- Engineering patterns: strict TypeScript, Zod at API boundaries, TanStack Query invalidation (no full-page reloads), JWT + Google OAuth, Sentry tunneled through your own API
 
-- ✅ **Production-Ready**: Real-world patterns, error handling, and optimizations
-- ✅ **Serverless Architecture**: AWS Lambda + API Gateway + DynamoDB
-- ✅ **Modern React**: Hooks, Context API, React Query for state management
-- ✅ **Complete E-Commerce**: Products, Cart, Checkout, Orders, Reviews, Tickets
-- ✅ **Admin Dashboard**: Analytics, user management, order processing
-- ✅ **Third-Party Integrations**: Stripe, Cloudinary, Brevo, Shippo
-- ✅ **Responsive Design**: Mobile-first with Tailwind CSS
-- ✅ **Type Safety**: Explicit TypeScript types throughout
-- ✅ **Educational**: Well-documented code with learning-focused structure
+### What makes it useful for learning?
+
+| Topic            | What you can study here                                               |
+| ---------------- | --------------------------------------------------------------------- |
+| SPA architecture | Vite + React Router (no SSR / no Next.js App Router)                  |
+| Server state     | TanStack Query keys, persist-to-localStorage, mutation invalidation   |
+| Backend API      | Express routes → services → Prisma → PostgreSQL                       |
+| Payments         | Stripe PaymentIntent + webhook signature verification                 |
+| Auth             | Email/password JWT + Google OAuth CSRF `state` cookie                 |
+| UI systems       | Shared `components/ui/*`, Tailwind tokens, Sonner toasts, AlertDialog |
+| Ops readiness    | Helmet, rate limits, `.env.example` hygiene, Sentry tunnel            |
 
 ---
 
 ## Architecture Overview
 
-```bash
-┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React)                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │   Pages      │  │  Components  │  │    Hooks     │       │
-│  │              │  │              │  │              │       │
-│  │  - Home      │  │  - UI Cards  │  │  - useQuery  │       │
-│  │  - Products  │  │  - Forms     │  │  - useAuth   │       │
-│  │  - Cart      │  │  - Tables    │  │  - useCart   │       │
-│  │  - Admin     │  │  - Layouts   │  │  - ...       │       │
-│  └──────────────┘  └──────────────┘  └──────────────┘       │
-│                                                             │
-│  Deployed on: Vercel                                        │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-                        │ HTTPS Requests
-                        │
-┌───────────────────────▼───────────────────────────────────────┐
-│              AWS API Gateway (HTTP API)                       │
-│                                                               │
-│  Routes requests to appropriate Lambda functions              │
-└───────────────────────┬───────────────────────────────────────┘
-                        │
-        ┌───────────────┼───────────────┐
-        │               │               │
-┌───────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
-│   Products   │ │   Orders    │ │    Auth     │
-│   Lambda     │ │   Lambda    │ │   Lambda    │
-└───────┬──────┘ └──────┬──────┘ └──────┬──────┘
-        │               │               │
-        └───────────────┼───────────────┘
-                        │
-             ┌──────────▼──────────┐
-             │    AWS DynamoDB     │
-             │                     │
-             │  - products         │
-             │  - orders           │
-             │  - users            │
-             │  - reviews          │
-             │  - tickets          │
-             │  - activity-log     │
-             └─────────────────────┘
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  Frontend — React 19 + Vite + TypeScript (SPA)               │
+│  pages / components / hooks / services / context             │
+│  TanStack Query 5 · Tailwind 3 · React Router 7              │
+│  Local: http://localhost:3000                                │
+│  Hosting target: Vercel (cutover to new API pending)         │
+└────────────────────────────┬─────────────────────────────────┘
+                             │ HTTPS / JSON + Bearer JWT
+┌────────────────────────────▼─────────────────────────────────┐
+│  Backend — Express + Prisma + PostgreSQL                     │
+│  backend/src/{routes,services,lib}                           │
+│  Local recommended: http://localhost:4000                    │
+│  Deploy target: Coolify / Hetzner VPS (intentionally deferred)│
+└────────────────────────────┬─────────────────────────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        ▼                    ▼                    ▼
+   Stripe / Brevo      Cloudinary / Shippo   Google OAuth / LLMs
+   (payments/email)      (images/labels)      (sign-in / AI insights)
+
+Reference only (not live): aws-lambda/  ← retired AWS Lambda + DynamoDB API
 ```
+
+**Response shape tip:** routes return plain JSON (`res.status(n).json(data)`). Services hold business logic; Zod validates bodies at the route boundary before services run.
 
 ---
 
 ## Key Features
 
-### 🛍️ Customer Features
+### Storefront (customer)
 
-- **Product Browsing**: Search, filter, and browse products with detailed views
-- **Shopping Cart**: Persistent cart with stock validation and quantity management
-- **Authentication**: Secure JWT-based login/registration with role-based access
-- **Checkout**: Stripe Payment Element integration for secure payments
-- **Order Management**: Order history, tracking, and status updates
-- **Product Reviews**: 5-star rating system with review moderation
-- **Support Tickets**: Create and manage support tickets with email notifications
+- Product catalog with search/filter/sort, featured products, product detail (QR, ratings, book metadata)
+- Cart (persisted to `localStorage`) + Stripe Checkout
+- Optional **address book** + shipping address snapshot on orders
+- Dashboard order history + customer **order detail** with status timeline
+- Product reviews (verified-purchase badge) + support tickets (priority/category/order link)
+- Login / Register split-layout auth + one-click **demo accounts** + **Continue with Google**
 
-### 👨‍💼 Admin Features
+### Admin console
 
-- **Dashboard**: Business insights with revenue charts and analytics
-- **Product Management**: Full CRUD with image upload, stock management, QR codes
-- **Order Processing**: Update status, process refunds, generate shipping labels
-- **User Management**: View, edit, and manage user accounts
-- **Review Moderation**: Approve/reject product reviews
-- **Activity Logging**: Comprehensive activity tracking and audit logs
-- **Analytics**: Sales trends, top products, user analytics
+- Dashboard KPI cards + analytics charts (Recharts)
+- Products / Orders / Users / Reviews / Tickets CRUD with DataTable + detail pages
+- Order status, tracking, Shippo label generation, Stripe refunds
+- Review moderation + store reply (`adminReply`)
+- Activity / management history log
+- **AI Business Insights** (multi-provider free-tier LLM fallback)
+
+### Cross-cutting
+
+- Role-based routes (`user` vs `admin`)
+- Instant UI after mutations (TanStack Query invalidation — no `location.reload()`)
+- Admin code-split lazy chunk + idle prefetch for admins
+- Sentry error monitoring via first-party tunnel `POST /api/monitoring`
+- Invoice PDF attached to order-confirmation email (pdfkit + Brevo)
 
 ---
 
 ## Technology Stack
 
-### Frontend
-
-- **React 19.2.0** - UI library
-- **React Router DOM 7.9.6** - Routing
-- **TanStack React Query 5.90.10** - Server state & caching
-- **Tailwind CSS 3.4.1** - Styling
-- **ShadCN UI** - Component library
-- **Recharts 3.5.1** - Charts
-- **React Toastify** - Notifications
-
-### Backend
-
-- **AWS Lambda** - Serverless functions (Node.js 22.x)
-- **AWS API Gateway** - HTTP API
-- **AWS DynamoDB** - NoSQL database
-- **JWT** - Authentication
-- **bcryptjs** - Password hashing
-
-### Third-Party Services
-
-- **Stripe** - Payment processing
-- **Cloudinary** - Image storage
-- **Brevo** - Email service
-- **Shippo** - Shipping labels
+| Layer                 | Choice                                    | Why it matters               |
+| --------------------- | ----------------------------------------- | ---------------------------- |
+| UI                    | React 19                                  | Component model + hooks      |
+| Bundler               | Vite 8                                    | Fast HMR; replaces CRA       |
+| Language              | TypeScript 5.9 (strict)                   | Fewer runtime surprises      |
+| Routing               | React Router 7                            | Client-side SPA routes       |
+| Server state          | TanStack Query 5                          | Cache, refetch, invalidation |
+| Tables                | TanStack Table 8                          | Admin list pages             |
+| Styling               | Tailwind CSS 3                            | Utility-first design system  |
+| Icons / motion        | Lucide + Framer Motion                    | Consistent icons + reveals   |
+| Toasts                | Sonner                                    | Dynamic success/error titles |
+| API                   | Express 4                                 | Simple REST surface          |
+| ORM / DB              | Prisma + PostgreSQL                       | Typed schema + seed          |
+| Validation            | Zod                                       | Route-boundary schemas       |
+| Auth                  | JWT + bcrypt + Google OAuth               | Dual login paths             |
+| Payments              | Stripe                                    | Intent + webhook             |
+| Email / ship / images | Brevo / Shippo / Cloudinary               | Real integrations            |
+| Monitoring            | Sentry (`@sentry/react` + `@sentry/node`) | Ad-blocker-safe tunnel       |
 
 ---
 
 ## Project Structure
 
-```bash
-codebook-ecommerce/
-│
-├── codebook/                          # Main React application
+```text
+ecommerce-codebook/
+├── src/                      # Vite React frontend
+│   ├── pages/                # Route pages (Home, Products, Cart, Admin/*, …)
+│   ├── components/
+│   │   ├── ui/               # Reusable primitives (DataTable, forms, RippleButton, …)
+│   │   ├── Elements/         # ProductCard, ReviewForm, Rating, …
+│   │   ├── Layouts/          # Header, Footer, AdminLayout
+│   │   └── Sections/         # Search and composed sections
+│   ├── hooks/                # useProducts, useAdmin, useAuth, useTickets, …
+│   ├── services/             # fetch wrappers per domain (+ apiError.ts)
+│   ├── context/              # CartContext, FilterContext
+│   ├── routes/               # AllRoutes.tsx, ProtectedRoute.tsx
+│   ├── lib/                  # apiBase.ts, toast.ts, sentry.ts
+│   ├── utils/                # queryInvalidation helpers, export utils
+│   ├── reducers/             # Cart / filter reducers
+│   └── types/                # Shared frontend DTOs
+├── backend/                  # Live Express API
 │   ├── src/
-│   │   ├── components/               # Reusable components
-│   │   │   ├── Elements/             # Core UI elements
-│   │   │   ├── Layouts/             # Layout components
-│   │   │   ├── ui/                  # ShadCN UI components
-│   │   │   └── Sections/            # Page sections
-│   │   ├── pages/                    # Page components
-│   │   │   ├── Admin/               # Admin pages
-│   │   │   ├── Cart/                # Cart pages
-│   │   │   ├── Home/                # Homepage
-│   │   │   ├── Products/            # Product pages
-│   │   │   └── Tickets/             # Support tickets
-│   │   ├── hooks/                   # Custom React hooks
-│   │   ├── services/                # API service layer
-│   │   ├── context/                 # React Context providers
-│   │   ├── utils/                   # Utility functions
-│   │   └── routes/                  # Route definitions
-│   ├── aws-lambda/                   # AWS Lambda backend
-│   │   ├── functions/               # Lambda function handlers
-│   │   │   ├── products/           # Product endpoints
-│   │   │   ├── orders/             # Order endpoints
-│   │   │   ├── auth/                # Authentication
-│   │   │   ├── admin/               # Admin endpoints
-│   │   │   ├── payment/             # Stripe integration
-│   │   │   └── ...                  # Other endpoints
-│   │   ├── shared/                   # Shared utilities
-│   │   ├── template.yaml            # AWS SAM template
-│   │   └── deploy.sh                # Deployment script
-│   ├── public/                       # Static assets
-│   ├── data/                         # Mock data (db.json)
-│   └── README.md                     # Detailed frontend docs
-│
-├── codebook-backend-serverless-json-server-archived-reference/
-│   ├── backend-mock-json-server-project-reference/
-│   │   └── README.md                 # Archived mock server docs
-│   └── backend-vercel-serverless-functions-project-reference/
-│       └── api/README.md             # Archived Vercel functions docs
-│
-└── README.md                         # This file (root overview)
+│   │   ├── app.ts            # Middleware + route mounts
+│   │   ├── server.ts         # listen(PORT)
+│   │   ├── routes/           # HTTP endpoints
+│   │   ├── services/         # Business logic + Prisma
+│   │   └── lib/              # auth, rateLimit, ai/, sentry, …
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   └── seed.ts           # Seeds from ../data/db.json
+│   └── .env.example
+├── aws-lambda/               # Retired AWS backend (reference only)
+├── data/db.json              # Product seed source of truth
+├── public/                   # favicon, logos, images, fonts, sitemap
+├── docs/                     # Walkthrough, plan, styling, LLM guide
+├── .agile-v/                 # Requirements / decisions (team process)
+├── .env.example              # Frontend env template
+├── SECURITY.md               # Private vulnerability reporting
+└── README.md                 # You are here
 ```
 
 ---
 
-## Quick Start Guide
+## Prerequisites
 
-### Prerequisites
+- **Node.js** 20+ (22 recommended)
+- **PostgreSQL** 14+ running locally (or Docker)
+- Optional: Stripe / Google / Brevo / Cloudinary / Shippo / Sentry accounts for full feature parity
 
-- **Node.js** 18.x or higher
-- **npm** or **yarn**
-- **AWS Account** (for backend deployment)
-- **Git**
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/yourusername/codebook-ecommerce.git
-cd codebook-ecommerce
-```
-
-### 2. Install Frontend Dependencies
-
-```bash
-cd codebook
-npm install
-```
-
-### 3. Set Up Environment Variables
-
-Create a `.env` file in the `codebook/` directory (see [Environment Variables](#environment-variables) section below).
-
-### 4. Start Development Server
-
-```bash
-npm start
-```
-
-The application will open at `http://localhost:3000`
-
-### 5. Set Up Backend (Optional for Local Development)
-
-For full functionality, you'll need to deploy the AWS Lambda backend. See the [Backend Documentation](#documentation-links) for detailed instructions.
+You can explore much of the UI with **minimal env** (see below). Payments, OAuth, email, and AI need their respective keys.
 
 ---
 
 ## Environment Variables
 
-### Frontend Environment Variables
+Templates live in:
 
-Create a `.env` file in the `codebook/` directory:
+- Root: [`.env.example`](./.env.example) → copy to `.env` or `.env.local` (frontend)
+- Backend: [`backend/.env.example`](./backend/.env.example) → copy to `backend/.env`
 
-```env
-# API Configuration
-REACT_APP_LAMBDA_API_URL=https://your-api-gateway-url.execute-api.region.amazonaws.com
-REACT_APP_BASE_URL=http://localhost:3000
+**Never commit real `.env` files** (they are gitignored).
 
-# Stripe (Payment Processing)
-REACT_APP_STRIPE_PUB_KEY=pk_test_your_stripe_public_key
+### Do you need a `.env` to run anything?
 
-# Cloudinary (Image Upload)
-REACT_APP_CLOUDINARY_CLOUD_NAME=your_cloud_name
-REACT_APP_CLOUDINARY_UPLOAD_PRESET=your_upload_preset
-REACT_APP_IMAGE_SERVICE=cloudinary
+| Goal                                    | Minimum                                                                                           |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Frontend UI only against a mock/offline | Not practical — app expects an API                                                                |
+| Full local stack (catalog, auth, admin) | **Yes:** `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `PORT`, and frontend `VITE_LAMBDA_API_URL` |
+| Stripe checkout                         | Also Stripe keys (front + back)                                                                   |
+| Google sign-in                          | Google OAuth trio + `FRONTEND_URL`                                                                |
+| Emails / labels / AI / Sentry           | Optional — features degrade gracefully when unset                                                 |
 
-# Demo Accounts (Optional)
-REACT_APP_ADMIN_LOGIN=admin@example.com
-REACT_APP_ADMIN_PASSWORD=12345678
-REACT_APP_GUEST_LOGIN=test@example.com
-REACT_APP_GUEST_PASSWORD=12345678
+### Recommended local ports (avoid clashes)
+
+Vite already binds **frontend `:3000`**. Put the API on **`:4000`**:
+
+```bash
+# backend/.env
+PORT=4000
+CORS_ORIGINS=http://localhost:3000
+FRONTEND_URL=http://localhost:3000
+GOOGLE_CALLBACK_URL=http://localhost:4000/auth/google/callback
+
+# root .env / .env.local
+VITE_LAMBDA_API_URL=http://localhost:4000
 ```
 
-### Backend Environment Variables
+> The name `VITE_LAMBDA_API_URL` is historical (AWS Lambda era). It now points at the Express API. Do not point production at the old API Gateway URL — that stack is being retired.
 
-For AWS Lambda deployment, see `codebook/aws-lambda/README.md` for detailed secrets management.
+### Frontend variables (root `.env.example`)
 
-**Required Secrets:**
+| Variable                        | Required?             | Purpose                                                     |
+| ------------------------------- | --------------------- | ----------------------------------------------------------- |
+| `VITE_LAMBDA_API_URL`           | **Yes** for local API | Express base URL                                            |
+| `VITE_BASE_URL`                 | Optional              | Absolute links / QR; falls back to `window.location.origin` |
+| `VITE_STRIPE_PUB_KEY`           | For checkout          | Stripe publishable key                                      |
+| `VITE_IMAGE_SERVICE`            | Optional              | Usually `cloudinary`                                        |
+| `VITE_CLOUDINARY_CLOUD_NAME`    | Optional              | Own Cloudinary cloud                                        |
+| `VITE_CLOUDINARY_UPLOAD_PRESET` | Optional              | Unsigned upload preset                                      |
+| `VITE_SENTRY_DSN`               | Optional              | Browser Sentry DSN (public-safe)                            |
 
-- `JWT_SECRET` - Secret key for JWT token signing
-- `STRIPE_SECRET_KEY` - Stripe secret key
-- `STRIPE_WEBHOOK_SECRET` - Stripe webhook secret
-- `BREVO_API_KEY` - Brevo email API key
-- `BREVO_SENDER_EMAIL` - Sender email address
-- `BREVO_ADMIN_EMAIL` - Admin notification email
-- `SHIPPO_API_KEY` - Shippo API key for shipping labels
+### Backend variables (`backend/.env.example`)
 
-### Getting API Keys
+| Variable                                        | Required?           | Purpose                                  |
+| ----------------------------------------------- | ------------------- | ---------------------------------------- |
+| `PORT`                                          | Recommended         | Prefer `4000` locally                    |
+| `NODE_ENV`                                      | Optional            | `development` / `production`             |
+| `DATABASE_URL`                                  | **Yes**             | Postgres connection string               |
+| `CORS_ORIGINS`                                  | **Yes** in real use | Comma-separated frontend origins         |
+| `JWT_SECRET`                                    | **Yes**             | `openssl rand -base64 64` — backend only |
+| `STRIPE_SECRET_KEY`                             | Checkout            | Secret key                               |
+| `STRIPE_WEBHOOK_SECRET`                         | Webhooks            | From Stripe CLI / Dashboard              |
+| `BREVO_*`                                       | Email               | Transactional mail                       |
+| `SHIPPO_*`                                      | Labels              | Shipping label generation                |
+| `GOOGLE_CLIENT_ID` / `SECRET` / `CALLBACK_URL`  | OAuth               | Google Cloud Console                     |
+| `FRONTEND_URL`                                  | OAuth               | Where to land after Google callback      |
+| `BASE_URL`                                      | Optional            | QR/link fallback behind proxies          |
+| `GEMINI_API_KEY`, `GROQ_API_KEY`, …             | Optional            | AI insights providers                    |
+| `SENTRY_DSN` / `ORG` / `PROJECT` / `AUTH_TOKEN` | Optional            | Errors + source maps                     |
 
-1. **Stripe**: Sign up at [stripe.com](https://stripe.com) → Dashboard → Developers → API keys
-2. **Cloudinary**: Sign up at [cloudinary.com](https://cloudinary.com) → Dashboard → Settings → Upload presets
-3. **Brevo**: Sign up at [brevo.com](https://brevo.com) → Settings → API Keys
-4. **Shippo**: Sign up at [goshippo.com](https://goshippo.com) → Settings → API
+#### How to obtain common keys (short)
+
+1. **Postgres** — install locally or `docker run` Postgres; create DB/user; paste into `DATABASE_URL`.
+2. **JWT_SECRET** — `openssl rand -base64 64` (never put this in the frontend).
+3. **Stripe** — [Dashboard → Developers → API keys](https://dashboard.stripe.com/apikeys); use **test** keys locally. Webhooks: Stripe CLI `stripe listen --forward-to localhost:4000/payment/webhook`.
+4. **Google OAuth** — Google Cloud Console → OAuth client → Authorized redirect URI must **exactly** match `GOOGLE_CALLBACK_URL`.
+5. **Brevo / Shippo / Cloudinary / Sentry** — create free/test accounts; copy keys into `backend/.env` (and frontend where noted).
+6. **LLM keys** — see [`docs/LLM_MODEL_SELECTION.md`](./docs/LLM_MODEL_SELECTION.md); any non-empty subset enables AI insights.
 
 ---
 
-## Installation & Setup
-
-### Step 1: Install Dependencies
+## Installation & Local Run
 
 ```bash
-# Navigate to frontend directory
-cd codebook
+# Clone
+git clone https://github.com/arnobt78/Ecommerce-Shop-1-BookStore--React-FullStack.git
+cd Ecommerce-Shop-1-BookStore--React-FullStack
 
-# Install all dependencies
+# --- Backend ---
+cd backend
+cp .env.example .env
+# edit .env: DATABASE_URL, JWT_SECRET, PORT=4000, CORS_ORIGINS=http://localhost:3000
 npm install
-```
+npm run prisma:generate
+npm run prisma:push
+npm run seed
+npm run dev
+# → http://localhost:4000  |  health: GET /api/health
 
-### Step 2: Configure Environment
-
-1. Copy `.env.example` to `.env` (if available) or create a new `.env` file
-2. Fill in all required environment variables (see above)
-
-### Step 3: Set Up AWS Backend
-
-```bash
-# Navigate to Lambda directory
-cd aws-lambda
-
-# Install Lambda dependencies
+# --- Frontend (new terminal, repo root) ---
+cd ..
+cp .env.example .env.local
+# set VITE_LAMBDA_API_URL=http://localhost:4000
 npm install
-
-# Configure AWS credentials
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_REGION=eu-north-1
-
-# Set up secrets (see aws-lambda/README.md)
-cp .env.secrets.example .env.secrets
-# Edit .env.secrets with your actual secrets
+npm run dev
+# → http://localhost:3000
 ```
 
-### Step 4: Deploy Backend (Optional)
+### Useful scripts
 
-```bash
-cd aws-lambda
-./deploy.sh
-```
+| Where      | Command                      | What it does                        |
+| ---------- | ---------------------------- | ----------------------------------- |
+| Root       | `npm run dev`                | Vite dev server                     |
+| Root       | `npm run build`              | `tsc -b` + production bundle        |
+| Root       | `npm run lint`               | ESLint (`--max-warnings 0`)         |
+| Root       | `npm run typecheck`          | TypeScript project references       |
+| `backend/` | `npm run dev`                | `tsx watch` API server              |
+| `backend/` | `npm run seed`               | Idempotent seed from `data/db.json` |
+| `backend/` | `npm run lint` / `typecheck` | Backend quality gates               |
 
-This will deploy all Lambda functions and return an API Gateway URL. Update your frontend `.env` with this URL.
+### Optional: Launch with Diploi
+
+One-click launch badge (same as the header):
+
+[![launch with diploi button](https://diploi.com/launch-big.svg)](https://diploi.com/launch/arnobt78/Ecommerce-Shop-1-BookStore--React-FullStack)
+
+More info: [https://diploi.com/](https://diploi.com/)
 
 ---
 
-## Running the Project
+## Demo Accounts
 
-### Development Mode
+Seeded by `npm run seed` (`User.isDemo = true`). The Login page loads them from `GET /auth/demo-accounts` — **no passwords in the frontend bundle**.
 
-```bash
-cd codebook
-npm start
-```
+| Email            | Role  | Password (email login) |
+| ---------------- | ----- | ---------------------- |
+| `test@admin.com` | admin | `12345678`             |
+| `test@user.com`  | user  | `12345678`             |
 
-- Opens `http://localhost:3000`
-- Hot reload enabled
-- Development tools available
-
-### Production Build
-
-```bash
-cd codebook
-npm run build
-```
-
-Creates an optimized production build in the `build/` directory.
-
-### Testing
-
-```bash
-cd codebook
-npm test
-```
+Prefer the Login page **demo dropdown** (one-click `POST /auth/demo-login`) while learning.
 
 ---
 
-## Deployment
+## Frontend Routes
 
-### Frontend Deployment (Vercel)
+| Path                                          | Access | Purpose                                                                           |
+| --------------------------------------------- | ------ | --------------------------------------------------------------------------------- |
+| `/`                                           | Public | Home, hero, featured, FAQ                                                         |
+| `/products`, `/products/:id`                  | Public | Catalog + detail                                                                  |
+| `/login`, `/register`                         | Public | Auth split layout                                                                 |
+| `/auth/callback`                              | Public | Google OAuth handoff                                                              |
+| `/cart`, `/order-summary`                     | Auth   | Cart + summary                                                                    |
+| `/payment-success`, `/payment-cancel`         | Auth   | Stripe return                                                                     |
+| `/dashboard`                                  | Auth   | Orders + address book                                                             |
+| `/orders/:id`                                 | Auth   | Customer order detail + timeline                                                  |
+| `/tickets`, `/tickets/create`, `/tickets/:id` | Auth   | Support                                                                           |
+| `/admin/*`                                    | Admin  | Dashboard, products, orders, users, insights, history, tickets, reviews, settings |
 
-1. **Connect Repository to Vercel**
-   - Go to [vercel.com](https://vercel.com)
-   - Import your GitHub repository
-   - Set root directory to `codebook`
+Guards live in `src/routes/ProtectedRoute.tsx` (`requiredRole="admin"` for admin trees). Admin pages are **lazy-loaded** so customers never download the admin chunk on first paint.
 
-2. **Configure Environment Variables**
-   - Add all `REACT_APP_*` variables in Vercel dashboard
-   - Use production URLs for `REACT_APP_BASE_URL` and `REACT_APP_LAMBDA_API_URL`
+---
 
-3. **Deploy**
-   - Vercel will automatically deploy on push to main branch
-   - Or manually deploy via Vercel CLI: `vercel deploy`
+## Backend API Endpoints
 
-### Backend Deployment (AWS Lambda)
+Base URL = `VITE_LAMBDA_API_URL` (e.g. `http://localhost:4000`). Auth: `Authorization: Bearer <jwt>` unless noted.
 
-See detailed instructions in `codebook/aws-lambda/README.md`:
+### Health & monitoring
 
-```bash
-cd codebook/aws-lambda
-./deploy.sh
+| Method | Path              | Notes                                                |
+| ------ | ----------------- | ---------------------------------------------------- |
+| GET    | `/api/health`     | `{ status: "ok" }`                                   |
+| POST   | `/api/monitoring` | Sentry envelope tunnel (browser → your API → Sentry) |
+
+### Auth
+
+| Method | Path                    | Notes                           |
+| ------ | ----------------------- | ------------------------------- |
+| POST   | `/login`, `/register`   | Rate-limited                    |
+| GET    | `/auth/demo-accounts`   | Public demo list                |
+| POST   | `/auth/demo-login`      | Rate-limited one-click demo JWT |
+| GET    | `/auth/google`          | Redirect to Google              |
+| GET    | `/auth/google/callback` | OAuth callback + CSRF `state`   |
+
+### Catalog & commerce
+
+| Method          | Path                                            | Notes                                          |
+| --------------- | ----------------------------------------------- | ---------------------------------------------- |
+| GET             | `/products`, `/products/:id`                    | Public catalog                                 |
+| GET             | `/featured-products`                            | Featured list (UI may also filter client-side) |
+| POST/PUT/DELETE | `/admin/products`…                              | Admin CRUD                                     |
+| GET/POST        | `/orders`, `/orders/:id`                        | Customer orders                                |
+| GET/PUT/POST    | `/admin/orders`…                                | Status, tracking, label, refund                |
+| POST/GET        | `/payment/create-intent`, `/payment/verify/:id` | Stripe                                         |
+| POST            | `/payment/webhook`                              | Raw body + signature                           |
+
+### Social / support / admin
+
+| Domain        | Paths                                               |
+| ------------- | --------------------------------------------------- |
+| Addresses     | `GET/POST /addresses`, `PUT/DELETE /addresses/:id`  |
+| Reviews       | `/reviews`, `/admin/reviews`, `/admin/reviews/:id`  |
+| Tickets       | `/tickets`, `/tickets/:id/reply`, status + priority |
+| Notifications | `/notifications/count`, `/notifications/mark-read`  |
+| Users         | `/admin/users` CRUD                                 |
+| Activity      | `/admin/activity-logs`                              |
+| Email         | `POST /email/send`                                  |
+| AI            | `POST /admin/ai-insights`                           |
+
+---
+
+## How Core Pieces Work (Learner Guide)
+
+### 1. Frontend talks to the API
+
+All services import one base URL:
+
+```ts
+// src/lib/apiBase.ts
+export const API_BASE_URL =
+  import.meta.env.VITE_LAMBDA_API_URL || "http://localhost:3000";
 ```
+
+Example pattern (simplified):
+
+```ts
+const res = await fetch(`${API_BASE_URL}/products`, {
+  headers: { Authorization: `Bearer ${token}` },
+});
+if (!res.ok) throw await throwApiError(res);
+return res.json();
+```
+
+### 2. TanStack Query + invalidation
+
+Hooks wrap services. After a mutation succeeds, helpers in `src/utils/queryInvalidation.ts` invalidate **every** related key (lists, detail, admin stats, badges) so the UI updates without reload.
+
+**Rule of thumb:** if you add a new write API, add/extend an invalidation helper — never leave stale screens.
+
+### 3. Auth session
+
+JWT + role + user id live in `sessionStorage`. `ProtectedRoute` checks them. Logout calls `queryClient.clear()` so persisted Query cache cannot leak across accounts.
+
+### 4. Backend layering
+
+```text
+Route (Zod + auth middleware) → Service (Prisma / Stripe / email) → JSON response
+```
+
+Ownership for customer resources comes from `req.user.id` (JWT), never from a client-supplied user id — important for addresses and tickets.
+
+### 5. Digital goods note
+
+Products are **eBook downloads** (Dashboard library). Physical warehouse fields were intentionally not added. Shippo/address book support admin demos and optional shipping metadata, not a warehouse WMS.
+
+---
+
+## Reusable Components & Patterns
+
+### UI primitives (`src/components/ui/`)
+
+| Component                                    | Reuse idea                                             |
+| -------------------------------------------- | ------------------------------------------------------ |
+| `DataTable`                                  | Any sortable admin list + row actions (`DropdownMenu`) |
+| `FormInput` / `FormSelect` / `FormTextarea`  | Controlled forms with shared error styling             |
+| `AlertDialog`                                | Confirm destructive actions (delete, cancel, refund)   |
+| `RippleButton`                               | Primary CTAs with click feedback                       |
+| `AuthSplitLayout`                            | Login/Register 60/40 image+form shell                  |
+| `AddressLines`                               | Render postal addresses consistently                   |
+| `UserAvatar`                                 | Real image or Robohash fallback                        |
+| `OrderTrackingInfo`                          | Tracking + shipping address display                    |
+| `motion` (`ScrollReveal` / `Stagger*`)       | Page enter / field stagger animations                  |
+| `EmptyState` / `ErrorState` / `LoadingState` | Consistent async UI                                    |
+
+**How to reuse in another project**
+
+1. Copy the primitive + its Tailwind classes (or extract a design-token layer).
+2. Keep props narrow and typed — match existing call sites.
+3. Prefer composition over forks (`PageHeader` + `DataTable` instead of one mega-page).
+
+### Hooks & services
+
+Pairing convention:
+
+```text
+productService.ts  ↔  useProducts.ts
+ticketService.ts   ↔  useTickets.ts
+adminService.ts    ↔  useAdmin.ts
+```
+
+When adding a domain elsewhere: **service (HTTP) → hook (Query) → page (UI)** — same three layers.
+
+### Layout width
+
+Page width comes from **one** wrapper in `App.tsx`:
+
+`mx-auto max-w-9xl px-2 sm:px-4 xl:px-8`
+
+Do not nest another `max-w-*` on pages or you will desync Header/Footer.
+
+---
+
+## Libraries & Dependencies (Short Lessons)
+
+| Library                     | What it is               | How CodeBook uses it         |
+| --------------------------- | ------------------------ | ---------------------------- |
+| **React**                   | UI library               | Pages + components           |
+| **Vite**                    | Dev server + bundler     | `npm run dev` / `build`      |
+| **TypeScript**              | Typed JS                 | Strict frontend + backend    |
+| **React Router**            | Client routing           | `AllRoutes.tsx`              |
+| **TanStack Query**          | Async server-state cache | Hooks + persisted cache      |
+| **TanStack Table**          | Headless tables          | Admin `DataTable`            |
+| **Tailwind**                | Utility CSS              | Almost all styling           |
+| **Framer Motion**           | Animation                | Auth stagger + route fade    |
+| **Lucide**                  | Icons                    | Replaced Bootstrap Icons     |
+| **Sonner**                  | Toasts                   | `src/lib/toast.ts` wrapper   |
+| **Stripe.js**               | Browser payments         | `StripeCheckout`             |
+| **Express**                 | HTTP framework           | `backend/src/app.ts`         |
+| **Prisma**                  | ORM                      | Schema + seed + queries      |
+| **Zod**                     | Schema validation        | Route inputs                 |
+| **jsonwebtoken / bcryptjs** | Auth primitives          | Login/register               |
+| **pdfkit**                  | PDF generation           | Invoice attachment           |
+| **Sentry**                  | Error monitoring         | Tunnel via `/api/monitoring` |
 
 ---
 
 ## Documentation Links
 
-### 📚 Detailed Documentation
-
-- **[Frontend Documentation](./codebook/README.md)** - Complete React app documentation
-  - Component guide
-  - Hooks reference
-  - API services
-  - State management
-  - Code examples
-
-- **[Backend Documentation](./codebook/aws-lambda/README.md)** - AWS Lambda backend docs
-  - Deployment guide
-  - Secrets management
-  - Cost monitoring
-  - Troubleshooting
-
-### 📖 Archived References
-
-- **[Mock JSON Server Reference](./codebook-backend-serverless-json-server-archived-reference/backend-mock-json-server-project-reference/README.md)** - Archived mock backend
-- **[Vercel Functions Reference](./codebook-backend-serverless-json-server-archived-reference/backend-vercel-serverless-functions-project-reference/api/README.md)** - Archived Vercel functions
-
----
-
-## Project Architecture
-
-### Frontend Architecture
-
-```bash
-┌─────────────────────────────────────────────────────────┐
-│                    React Application                    │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│  │   Routing    │  │   Context    │  │   React      │   │
-│  │   Layer      │→ │   Providers  │→ │   Query      │   │
-│  └──────────────┘  └──────────────┘  └──────────────┘   │
-│         │                  │                  │         │
-│         └──────────────────┼──────────────────┘         │
-│                            │                            │
-│                    ┌───────▼────────┐                   │
-│                    │   Components   │                   │
-│                    │                │                   │
-│                    │  - Pages       │                   │
-│                    │  - UI Cards    │                   │
-│                    │  - Forms       │                   │
-│                    │  - Layouts     │                   │
-│                    └───────┬────────┘                   │
-│                            │                            │
-│                    ┌───────▼────────┐                   │
-│                    │  Service Layer │                   │
-│                    │                │                   │
-│                    │  - API Calls   │                   │
-│                    │  - Error       │                   │
-│                    │    Handling    │                   │
-│                    └───────┬────────┘                   │
-│                            │                            │
-└────────────────────────────┼────────────────────────────┘
-                             │
-                    HTTPS Requests
-                             │
-┌────────────────────────────▼─────────────────────────────┐
-│              AWS API Gateway                             │
-└──────────────────────────────────────────────────────────┘
-```
-
-### State Management Strategy
-
-1. **Server State**: TanStack React Query
-   - API data fetching
-   - Caching with `staleTime: Infinity`
-   - Automatic cache invalidation
-   - Optimistic updates
-
-2. **Client State**: React Context + useReducer
-   - Cart state (`CartContext`)
-   - Filter state (`FilterContext`)
-   - Loading state (`LoadingContext`)
-
-3. **Form State**: Controlled components
-   - React state for form inputs
-   - Validation with custom hooks
-   - Error handling
-
----
-
-## API Endpoints
-
-### Public Endpoints
-
-```text
-GET    /products              # Get all products
-GET    /products/:id          # Get product by ID
-POST   /auth/login            # User login
-POST   /auth/register         # User registration
-```
-
-### Protected Endpoints (Require JWT Token)
-
-```text
-# Orders
-GET    /orders                # Get user orders
-POST   /orders                # Create new order
-
-# Reviews
-GET    /reviews/product/:id   # Get product reviews
-POST   /reviews                # Create review
-
-# Tickets
-GET    /tickets                # Get user tickets
-POST   /tickets                # Create ticket
-PUT    /tickets/:id            # Update ticket
-```
-
-### Admin Endpoints (Require Admin Role)
-
-```text
-# Products
-POST   /admin/products         # Create product
-PUT    /admin/products/:id    # Update product
-DELETE /admin/products/:id    # Delete product
-
-# Orders
-GET    /admin/orders           # Get all orders
-PUT    /admin/orders/:id      # Update order status
-POST   /admin/orders/:id/refund # Process refund
-
-# Users
-GET    /admin/users            # Get all users
-PUT    /admin/users/:id        # Update user
-DELETE /admin/users/:id       # Delete user
-
-# Analytics
-GET    /admin/analytics/revenue # Revenue analytics
-GET    /admin/analytics/sales  # Sales trends
-```
-
-**Full API Documentation**: See `codebook/aws-lambda/README.md` for detailed endpoint documentation.
-
----
-
-## Component Reusability
-
-### ShadCN UI Components
-
-All UI components are built on ShadCN UI for maximum reusability:
-
-```javascript
-// Example: Using Card component
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-
-function ProductCard({ product }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{product.name}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p>{product.overview}</p>
-      </CardContent>
-    </Card>
-  );
-}
-```
-
-### Custom Hooks
-
-Reusable hooks for common functionality:
-
-```javascript
-// useProducts - Fetch and manage products
-import { useProducts } from "@/hooks/useProducts";
-
-function ProductsPage() {
-  const { products, isLoading, error } = useProducts();
-  // Use products data
-}
-
-// useCart - Cart management
-import { useCart } from "@/context/CartContext";
-
-function CartButton() {
-  const { addToCart, cartItems } = useCart();
-  // Manage cart
-}
-```
-
-### Service Layer
-
-Centralized API calls:
-
-```javascript
-// productService.js
-import { apiClient } from "./apiClient";
-
-export const productService = {
-  getAll: () => apiClient.get("/products"),
-  getById: (id) => apiClient.get(`/products/${id}`),
-  create: (data) => apiClient.post("/admin/products", data),
-};
-```
-
-**For detailed component examples**, see `codebook/README.md` section on "Reusing Components".
-
----
-
-## Code Examples
-
-### Using React Query for Data Fetching
-
-```javascript
-import { useQuery } from "@tanstack/react-query";
-import { productService } from "@/services/productService";
-
-function ProductDetail({ productId }) {
-  const {
-    data: product,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["product", productId],
-    queryFn: () => productService.getById(productId),
-    staleTime: Infinity, // Cache forever until invalidation
-  });
-
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState error={error} />;
-
-  return <ProductCard product={product} />;
-}
-```
-
-### Creating a Mutation
-
-```javascript
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { productService } from "@/services/productService";
-import { toast } from "react-toastify";
-
-function CreateProductForm() {
-  const queryClient = useQueryClient();
-
-  const mutation = useMutation({
-    mutationFn: productService.create,
-    onSuccess: () => {
-      // Invalidate and refetch products
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast.success("Product created successfully!");
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const handleSubmit = (data) => {
-    mutation.mutate(data);
-  };
-
-  return <form onSubmit={handleSubmit}>...</form>;
-}
-```
-
-### Using Context for Global State
-
-```javascript
-// CartContext.js
-import { createContext, useContext, useReducer } from "react";
-import { cartReducer } from "@/reducers/cartReducers";
-
-const CartContext = createContext();
-
-export function CartProvider({ children }) {
-  const [cart, dispatch] = useReducer(cartReducer, []);
-
-  const addToCart = (product) => {
-    dispatch({ type: "ADD_TO_CART", payload: product });
-  };
-
-  return (
-    <CartContext.Provider value={{ cart, addToCart }}>
-      {children}
-    </CartContext.Provider>
-  );
-}
-
-// Usage
-function ProductCard({ product }) {
-  const { addToCart } = useContext(CartContext);
-
-  return <button onClick={() => addToCart(product)}>Add to Cart</button>;
-}
-```
-
-### Protected Routes
-
-```javascript
-// ProtectedRoute.js
-import { Navigate } from "react-router-dom";
-import { useUser } from "@/hooks/useUser";
-
-function ProtectedRoute({ children, requireAdmin = false }) {
-  const { user, isLoading } = useUser();
-
-  if (isLoading) return <LoadingState />;
-  if (!user) return <Navigate to="/login" />;
-  if (requireAdmin && !user.isAdmin) return <Navigate to="/" />;
-
-  return children;
-}
-
-// Usage in routes
-<Route
-  path="/admin"
-  element={
-    <ProtectedRoute requireAdmin>
-      <AdminDashboard />
-    </ProtectedRoute>
-  }
-/>;
-```
-
-**More code examples**: See `codebook/README.md` for comprehensive examples.
+| Doc                                                                                                  | Contents                                                                        |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [`docs/PROJECT_WALKTHROUGH.md`](./docs/PROJECT_WALKTHROUGH.md)                                       | Contributor orientation                                                         |
+| [`docs/PROJECT_PLAN.md`](./docs/PROJECT_PLAN.md)                                                     | Migration phases + checklist                                                    |
+| [`docs/UI_STYLING_GUIDE.md`](./docs/UI_STYLING_GUIDE.md)                                             | Visual tokens / cards                                                           |
+| [`docs/LLM_MODEL_SELECTION.md`](./docs/LLM_MODEL_SELECTION.md)                                       | Multi-provider AI reference                                                     |
+| [`docs/Redis_Sentry_PostHog_INTEGRATION_GUIDE.md`](./docs/Redis_Sentry_PostHog_INTEGRATION_GUIDE.md) | Observability patterns (Next-oriented guide; this app uses Vite+Express Sentry) |
+| [`.agile-v/REQUIREMENTS.md`](./.agile-v/REQUIREMENTS.md)                                             | Traceable REQ-IDs                                                               |
+| [`SECURITY.md`](./SECURITY.md)                                                                       | Vulnerability reporting                                                         |
+| [`LICENSE`](./LICENSE)                                                                               | MIT                                                                             |
 
 ---
 
 ## Keywords
 
-**Frontend**: React, React Router, React Query, TanStack Query, Hooks, Context API, Tailwind CSS, ShadCN UI, Responsive Design, Dark Mode, Component Reusability, State Management, Form Validation, Error Handling, Loading States, Toast Notifications
+**Frontend:** React 19, Vite, TypeScript, React Router 7, TanStack Query, TanStack Table, Tailwind CSS, Lucide, Framer Motion, Sonner, SPA, JWT sessionStorage, Google OAuth callback, code splitting, localStorage cart, persisted query cache
 
-**Backend**: AWS Lambda, Serverless, API Gateway, DynamoDB, JWT Authentication, bcrypt, Node.js, AWS SAM, Infrastructure as Code, RESTful API, HTTP API
+**Backend:** Express, Prisma, PostgreSQL, Zod, Helmet, express-rate-limit, bcrypt, jsonwebtoken, pdfkit, Stripe webhooks, Brevo, Shippo, Cloudinary, Sentry tunnel, multi-provider LLM insights
 
-**Services**: Stripe, Payment Processing, Cloudinary, Image Upload, Brevo, Email Service, Shippo, Shipping Labels, QR Code Generation
+**E-commerce:** eBook storefront, shopping cart, checkout, order timeline, address book, reviews, support tickets, admin analytics, inventory stock, refunds, shipping labels, RBAC
 
-**Architecture**: Serverless Architecture, Microservices, NoSQL Database, REST API, JWT Tokens, Role-Based Access Control, Caching Strategy, Optimistic Updates, Error Boundaries
+**Learning:** full-stack project, educational codebase, reusable UI primitives, API design, cache invalidation, environment configuration
 
-**DevOps**: Vercel Deployment, AWS Deployment, Environment Variables, Secrets Management, Cost Monitoring, CloudWatch, CI/CD
+---
 
-**E-Commerce**: Shopping Cart, Checkout, Order Management, Product Management, Inventory Management, Stock Tracking, Reviews, Ratings, Support Tickets, Analytics, Dashboard
+## Security
+
+Please read **[SECURITY.md](./SECURITY.md)** before reporting issues.
+
+- Private reports only: **[contact@arnobmahmud.com](mailto:contact@arnobmahmud.com)**
+- Do **not** file public GitHub issues for vulnerabilities
+- Do **not** attach real secrets or `.env` files
 
 ---
 
 ## Contributing
 
-This is an educational project. Contributions are welcome! Here's how you can contribute:
+This is an educational open-source project. Contributions are welcome:
 
-1. **Fork the Repository**
-2. **Create a Feature Branch**: `git checkout -b feature/amazing-feature`
-3. **Make Your Changes**: Follow the existing code style and patterns
-4. **Test Your Changes**: Ensure all functionality works correctly
-5. **Commit Your Changes**: `git commit -m 'Add amazing feature'`
-6. **Push to Branch**: `git push origin feature/amazing-feature`
-7. **Open a Pull Request**: Describe your changes clearly
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Match existing patterns (TypeScript strict, shared UI, Query invalidation)
+4. Run `npm run lint` and `npm run typecheck` (and the same under `backend/`)
+5. Open a Pull Request with a clear description
 
-### Code Style Guidelines
+### Style guidelines
 
-- Use functional components with hooks
-- Follow React best practices
-- Use explicit TypeScript types (even in .js files via JSDoc)
-- Maintain consistent naming conventions
-- Add comments for complex logic
-- Use ShadCN UI components when possible
-- Follow the existing project structure
+- Functional React components + hooks
+- No `any` — prefer precise types
+- Reuse `components/ui` instead of one-off markup
+- Invalidate all affected Query keys after writes
+- Never commit secrets
 
 ---
 
 ## Conclusion
 
-**CodeBook E-Commerce** is a comprehensive, production-ready e-commerce platform that demonstrates modern web development practices. It showcases:
+CodeBook is both a **working eBook store** and a **teaching codebase**: Vite SPA frontend, Express/Prisma API, real Stripe/auth/admin flows, and careful cache/invalidation habits. Use the legacy live demo to explore the UX today; use the local Vite + `backend/` stack to learn the post-AWS architecture as Coolify/Vercel cutover continues.
 
-- **Modern React Patterns**: Hooks, Context, React Query
-- **Serverless Architecture**: AWS Lambda + API Gateway + DynamoDB
-- **Third-Party Integrations**: Stripe, Cloudinary, Brevo, Shippo
-- **Production Best Practices**: Error handling, caching, optimization
-- **Educational Value**: Well-documented code for learning
-
-### What You Can Learn
-
-- Building scalable React applications
-- Serverless backend architecture
-- State management with React Query
-- Payment processing integration
-- Admin dashboard development
-- Responsive design patterns
-- API design and integration
-- AWS services usage
-
-### Next Steps
-
-1. **Explore the Code**: Start with `codebook/src/App.js` and follow the routes
-2. **Read the Documentation**: Check `codebook/README.md` for detailed guides
-3. **Deploy Your Own**: Follow the deployment guides to set up your instance
-4. **Extend the Features**: Add new functionality and learn by doing
-
-### Resources
-
-- [React Documentation](https://react.dev)
-- [TanStack Query Docs](https://tanstack.com/query/latest)
-- [AWS Lambda Docs](https://docs.aws.amazon.com/lambda/)
-- [Tailwind CSS Docs](https://tailwindcss.com/docs)
-- [ShadCN UI Docs](https://ui.shadcn.com)
+If you build something on top of it, share it — and enjoy the process.
 
 ---
 
@@ -826,12 +617,10 @@ This is an educational project. Contributions are welcome! Here's how you can co
 
 This project is licensed under the [MIT License](https://opensource.org/licenses/MIT). Feel free to use, modify, and distribute the code as per the terms of the license.
 
+---
+
 ## Happy Coding! 🎉
 
-This is an **open-source project** - feel free to use, enhance, and extend this project further!
+This is an **open-source project** — feel free to use, enhance, and extend this project further!
 
 If you have any questions or want to share your work, reach out via GitHub or my portfolio at [https://www.arnobmahmud.com](https://www.arnobmahmud.com).
-
-**Enjoy building and learning!** 🚀
-
-Thank you! 😊

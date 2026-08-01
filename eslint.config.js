@@ -14,7 +14,15 @@ export default tseslint.config(
     // aws-lambda/ is the retired legacy backend (kept only for reference, see
     // docs/PROJECT_WALKTHROUGH.md §1); .aws-sam is its generated build output.
     // Neither is part of the live Vite/Express codebase and must not be linted.
-    ignores: ["dist", "build", "node_modules", "aws-lambda", "**/.aws-sam/**"],
+    ignores: [
+      "dist",
+      "build",
+      "node_modules",
+      "aws-lambda",
+      "**/.aws-sam/**",
+      "backend/**",
+      ".agile-v/**",
+    ],
   },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
@@ -31,6 +39,24 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    },
+  },
+  // Established pattern: Context/Provider colocated with consumer hooks (REQ-1632).
+  {
+    files: [
+      "src/context/**/*.{ts,tsx}",
+      "src/components/Layouts/Admin/AdminLayoutContext.tsx",
+      "src/components/ui/motion.tsx",
+    ],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
+  // TanStack Table's useReactTable returns non-memoizable functions by design.
+  {
+    files: ["src/components/ui/data-table.tsx"],
+    rules: {
+      "react-hooks/incompatible-library": "off",
     },
   }
 );

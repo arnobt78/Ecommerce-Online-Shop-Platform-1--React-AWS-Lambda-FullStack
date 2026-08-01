@@ -72,10 +72,11 @@ ecommerce-codebook/
 ├── aws-lambda/               # Legacy Lambda backend — kept for reference only, not live
 ├── data/
 │   ├── db.json                # Seed source of truth: 15 real, hand-enriched product records
-│   └── routes.json            # Legacy json-server route table (dead, reference only)
+│   └── db.json                # Seed source of truth: 15 real, hand-enriched product records
 ├── docs/                     # Design specs, this walkthrough, the migration plan,
 │                             #   LLM_MODEL_SELECTION.md (generic multi-provider AI reference)
 ├── .agile-v/                 # Agile-V governance: REQUIREMENTS.md, STATE.md, DECISION_LOG.md…
+├── SECURITY.md               # Private vuln reporting (contact@arnobmahmud.com)
 └── public/, build/            # Vite static assets / production build output
 ```
 
@@ -83,26 +84,28 @@ ecommerce-codebook/
 
 ## 3. Running it locally
 
-**Prerequisites:** Node 22, a local PostgreSQL instance.
+**Prerequisites:** Node 20+, a local PostgreSQL instance.
 
 ```bash
-# 1. Backend
+# 1. Backend (use PORT=4000 — Vite owns :3000)
 cd backend
+cp .env.example .env   # set DATABASE_URL, JWT_SECRET, PORT=4000, CORS_ORIGINS=http://localhost:3000
 npm install
 npm run prisma:generate
 npm run prisma:push       # syncs schema.prisma to the DB (no shadow-DB migrations)
 npm run seed               # idempotent — safe to re-run, upserts from data/db.json
-npm run dev                 # starts on :4000, auto-restarts on change
+npm run dev                 # http://localhost:4000
 
 # 2. Frontend (separate terminal, from repo root)
+cp .env.example .env.local  # VITE_LAMBDA_API_URL=http://localhost:4000
 npm install
-npm start                   # starts on :3000 (Vite)
+npm run dev                 # http://localhost:3000 (Vite)
 ```
 
 Required env files (both gitignored, never commit secrets):
 
-- `backend/.env` — `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, Stripe/Brevo/Shippo keys, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`GOOGLE_CALLBACK_URL`, `FRONTEND_URL`, and any subset of the 9 free-tier AI provider keys (`docs/LLM_MODEL_SELECTION.md`) to enable AI Business Insights.
-- `.env.local` (repo root) — `VITE_LAMBDA_API_URL` (points at the backend, `http://localhost:4000` locally despite the legacy name), `VITE_STRIPE_PUB_KEY`, Cloudinary config. Renamed from `REACT_APP_*` in the Phase 2 Vite migration — Vite only exposes `VITE_`-prefixed vars to client code, read via `import.meta.env` instead of `process.env`.
+- `backend/.env` — `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `PORT=4000`, Stripe/Brevo/Shippo keys, Google OAuth, `FRONTEND_URL=http://localhost:3000`, optional AI/Sentry keys.
+- `.env.local` (repo root) — `VITE_LAMBDA_API_URL=http://localhost:4000`, optional Stripe pub key / Cloudinary / Sentry. Vite exposes only `VITE_*` via `import.meta.env`.
 
 There is **no hardcoded demo-login credential** in any env file — see §5.
 

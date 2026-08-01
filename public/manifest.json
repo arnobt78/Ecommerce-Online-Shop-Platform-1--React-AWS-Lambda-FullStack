@@ -1,6 +1,9 @@
 {
   "short_name": "CodeBook",
-  "name": "CodeBook eCommerce AWS Serverless Platform",
+  "name": "CodeBook | Computer Science eBook E-Commerce Platform",
+  "description": "Full-stack eBook storefront and admin dashboard for computer science titles — catalog, cart, Stripe checkout, orders, reviews, and analytics.",
+  "lang": "en",
+  "dir": "ltr",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +13,28 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "256x256",
+      "purpose": "any"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "256x256",
+      "purpose": "any"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait-primary",
+  "theme_color": "#0ea5e9",
+  "background_color": "#ffffff",
+  "categories": ["shopping", "education", "books"],
+  "id": "/"
 }

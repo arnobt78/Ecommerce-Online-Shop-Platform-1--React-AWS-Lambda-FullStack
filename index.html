@@ -2,52 +2,131 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <!-- SEO & Social Metadata -->
+    <meta name="theme-color" content="#0ea5e9" />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- Primary SEO (REQ-1631) -->
+    <title>
+      CodeBook | Computer Science eBook E-Commerce Platform – Storefront &amp;
+      Admin Dashboard
+    </title>
     <meta
       name="title"
-      content="CodeBook – Latest Computer Science E-Books, Codebooks & Learning"
+      content="CodeBook | Computer Science eBook E-Commerce Platform – Storefront & Admin Dashboard"
     />
     <meta
       name="description"
-      content="CodeBook is a modern React eBook store for computer science learners. Browse, search, and order the latest codebooks and e-books. Features global state, JWT auth, REST API, Tailwind CSS, and seamless Netlify/Render deployment."
-    />
-    <meta
-      name="author"
-      content="Arnob Mahmud, arnob_t78@yahoo.com, https://arnob-mahmud.vercel.app/"
+      content="CodeBook is a full-stack e-commerce platform for computer science eBooks: product catalog, cart, Stripe checkout, order tracking, reviews, support tickets, and a full admin dashboard (products, orders, users, analytics, AI insights). Built with React, Vite, TypeScript, TanStack Query, Tailwind CSS, Express, Prisma, and PostgreSQL."
     />
     <meta
       name="keywords"
-      content="React, E-Commerce, Codebooks, Computer Science, eBooks, JWT Auth, REST API, Tailwind CSS, Netlify, Render, Learning Project, Global State, Context API, Shopping Cart, Modern Web, Full Stack"
+      content="CodeBook, eBook store, computer science eBooks, React e-commerce, Vite, TypeScript, TanStack Query, Tailwind CSS, Stripe checkout, admin dashboard, product management, order processing, reviews, support tickets, JWT auth, Google OAuth, Express, Prisma, PostgreSQL, Cloudinary, Brevo, Shippo, Sentry, Arnob Mahmud"
     />
+    <meta name="author" content="Arnob Mahmud" />
+    <meta name="creator" content="Arnob Mahmud" />
+    <meta name="publisher" content="Arnob Mahmud" />
+    <meta name="application-name" content="CodeBook" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="googlebot" content="index, follow" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="canonical" href="https://codebook-aws.vercel.app/" />
+    <link rel="author" href="https://www.arnobmahmud.com" />
+    <link rel="me" href="mailto:contact@arnobmahmud.com" />
+    <meta name="contact" content="contact@arnobmahmud.com" />
+    <meta name="reply-to" content="contact@arnobmahmud.com" />
+    <!-- Combined authorship string for crawlers that only read a single author meta -->
+    <meta
+      name="dcterms.creator"
+      content="Arnob Mahmud, contact@arnobmahmud.com, https://www.arnobmahmud.com"
+    />
+
+    <!-- Icons & PWA -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="256x256" href="/logo192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/logo512.png" />
+    <link rel="apple-touch-icon" href="/logo192.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CodeBook" />
+    <meta property="og:locale" content="en_US" />
     <meta
       property="og:title"
-      content="CodeBook – Latest Computer Science E-Books, Codebooks & Learning"
+      content="CodeBook | Computer Science eBook E-Commerce Platform – Storefront & Admin Dashboard"
     />
     <meta
       property="og:description"
-      content="A modern React eBook store for computer science learners. Browse, search, and order the latest codebooks and e-books. JWT auth, REST API, Tailwind CSS, Netlify/Render deployment."
+      content="Browse and buy computer science eBooks with Stripe checkout, order tracking, reviews, and a full admin dashboard for products, orders, users, and analytics."
     />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://ebookstore-arnob.netlify.app/" />
-    <meta property="og:image" content="/logo512.png" />
+    <meta property="og:url" content="https://codebook-aws.vercel.app/" />
+    <meta
+      property="og:image"
+      content="https://codebook-aws.vercel.app/logo512.png"
+    />
+    <meta property="og:image:alt" content="CodeBook – Computer Science eBook Store" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="CodeBook – Latest Computer Science E-Books, Codebooks & Learning"
+      content="CodeBook | Computer Science eBook E-Commerce Platform"
     />
     <meta
       name="twitter:description"
-      content="A modern React eBook store for computer science learners. Browse, search, and order the latest codebooks and e-books. JWT auth, REST API, Tailwind CSS, Netlify/Render deployment."
+      content="Full-stack eBook e-commerce: catalog, cart, Stripe checkout, reviews, tickets, and admin analytics. By Arnob Mahmud."
     />
-    <meta name="twitter:image" content="/logo512.png" />
+    <meta
+      name="twitter:image"
+      content="https://codebook-aws.vercel.app/logo512.png"
+    />
     <meta name="twitter:creator" content="@arnob_t78" />
-    <link rel="apple-touch-icon" href="/logo192.png" />
-    <!-- manifest.json provides metadata used when this app is installed on a user's mobile device or desktop. -->
-    <link rel="manifest" href="/manifest.json" />
-    <title>CodeBook – Latest Computer Science E-Books</title>
+    <meta name="twitter:site" content="@arnob_t78" />
+
+    <!-- JSON-LD: WebSite + Person (author) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://codebook-aws.vercel.app/#website",
+            "url": "https://codebook-aws.vercel.app/",
+            "name": "CodeBook",
+            "alternateName": "CodeBook Computer Science eBook E-Commerce Platform",
+            "description": "Full-stack e-commerce platform for computer science eBooks with storefront, Stripe checkout, and admin dashboard.",
+            "inLanguage": "en",
+            "publisher": { "@id": "https://www.arnobmahmud.com/#person" },
+            "author": { "@id": "https://www.arnobmahmud.com/#person" }
+          },
+          {
+            "@type": "Person",
+            "@id": "https://www.arnobmahmud.com/#person",
+            "name": "Arnob Mahmud",
+            "url": "https://www.arnobmahmud.com",
+            "email": "contact@arnobmahmud.com",
+            "sameAs": ["https://www.arnobmahmud.com"]
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "CodeBook",
+            "applicationCategory": "ShoppingApplication",
+            "operatingSystem": "Web",
+            "url": "https://codebook-aws.vercel.app/",
+            "author": { "@id": "https://www.arnobmahmud.com/#person" },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

@@ -3,5 +3,5 @@
 // a fallback pointing at the now-retired AWS Lambda/API Gateway endpoint — if
 // VITE_LAMBDA_API_URL was ever unset (fresh clone, misconfigured deploy target),
 // requests would silently go to a dead endpoint instead of the real Express
-// backend. Falls back to the documented local-dev backend port instead.
-export const API_BASE_URL = import.meta.env.VITE_LAMBDA_API_URL || "http://localhost:3000";
+// backend. Falls back to the documented local-dev backend port (4000) — Vite uses 3000.
+export const API_BASE_URL = import.meta.env.VITE_LAMBDA_API_URL || "http://localhost:4000";

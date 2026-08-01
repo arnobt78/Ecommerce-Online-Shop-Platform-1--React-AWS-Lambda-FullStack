@@ -48,6 +48,6 @@ Populated for baseline REQs from code inventory; `Test Evidence` and `Verified B
 | REQ-0804 | `src/pages/Dashboard/DashboardPage.js` | — | — | BASELINE |
 | REQ-0900 | `aws-lambda/functions/email/send-email.js` | — | — | BASELINE |
 | REQ-1000 | `aws-lambda/functions/admin/activity-logs.js` | — | — | BASELINE |
-| REQ-1101 | (working tree diff — see `git status`) | — | — | IN-PROGRESS, uncommitted |
-| REQ-1102 | (working tree diff — see `git status`) | — | — | IN-PROGRESS, uncommitted |
-| REQ-1103 | `.gitignore` | — | — | IN-PROGRESS, uncommitted |
+| REQ-1101 | repo root layout (was `codebook/`) — commit `14e53b2` | — | — | DONE |
+| REQ-1102 | archived reference backends removed — commit `14e53b2` | — | — | DONE |
+| REQ-1103 | root `.gitignore` | — | — | DONE |

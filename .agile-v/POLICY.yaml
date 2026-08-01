@@ -1,7 +1,7 @@
 version: 1
 profile: lightweight-solo
 project: CodeBook E-Commerce Platform
-updated: 2026-07-30
+updated: 2026-08-01
 
 risk_tiers:
   R0: "Docs, comments, styling-only, non-shipped scripts"
@@ -25,11 +25,12 @@ eval_gate:
   evidence_file: EVAL_RESULTS.md
 
 human_gate_notify:
-  - Any change touching aws-lambda/functions/payment/**
-  - Any change touching aws-lambda/functions/auth/**
+  - Any change touching backend/src/routes/payment.routes.ts or payment services
+  - Any change touching backend/src/routes/auth.routes.ts or auth/lib
+  - Any Coolify/VPS/production deploy (REQ-1201/1210–1212)
   - Any destructive git operation (reset --hard, force-push, branch -D, rm -rf)
-  - Any commit of the pending repo-flatten restructure (REQ-1101/REQ-1102)
 
 secrets_policy:
-  - Never read/print contents of .env, aws-lambda/.env.secrets in full
+  - Never read/print contents of .env, .env.local, backend/.env in full
   - Flag any accidental secret exposure in diffs before commit
+  - JWT_SECRET never in frontend bundle

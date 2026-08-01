@@ -1,3 +1,6 @@
 # https://www.robotstxt.org/robotstxt.html
+# Showcase demo (README Live-Demo). New Express backend + Vite cutover is not live on Vercel yet.
 User-agent: *
-Disallow:
+Allow: /
+
+Sitemap: https://codebook-aws.vercel.app/sitemap.xml

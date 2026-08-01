@@ -27,7 +27,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "lint": "eslint ."
+    "lint": "eslint . --max-warnings 0"
   },
   "browserslist": {
     "production": [

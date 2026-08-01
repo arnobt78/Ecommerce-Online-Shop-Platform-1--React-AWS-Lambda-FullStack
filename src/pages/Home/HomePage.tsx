@@ -5,7 +5,7 @@ import { Testimonials } from "./components/Testimonials";
 import { Faq } from "./components/Faq";
 
 export const HomePage = () => {
-  useTitle("CodeBook – Latest Computer Science E-Books, Codebooks & Learning");
+  useTitle("Computer Science eBook E-Commerce Platform");
 
   return (
     <main>

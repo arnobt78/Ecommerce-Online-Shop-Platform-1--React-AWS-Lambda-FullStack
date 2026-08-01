@@ -1,0 +1,50 @@
+---
+description: Agile V Infinity Loop — load every prompt; traceability, gates, verify
+alwaysApply: true
+---
+
+# Agile V Infinity Loop (CodeBook E-Commerce)
+
+**Every prompt:** load `agile-v-core` → `agile-v-pipeline` → `agile-v-lifecycle` (C2+) → role skill (`.agile-v/SKILLS.md`) → `agile-v-compliance` (gates).
+
+## Resume (read first)
+
+1. `.agile-v/STATE.md` — cycle, stage, verify baseline
+2. `.agile-v/CHECKPOINTS.md` — only if PENDING HITL
+3. `.agile-v/REQUIREMENTS.md` — parent `REQ-XXXX` before any artifact
+
+## Pipeline
+
+```
+Specify → Constrain → [Gate1] → Orchestrate → Prove → Verify → [Gate2] → Accept
+         ↑___________________________________________________________|
+```
+
+## Halt if
+
+- No parent REQ in `REQUIREMENTS.md`
+- Ambiguous or conflicting REQ
+- Build agent self-verifies only (no Red Team for R2/R3)
+- Gate 2 without `EVAL_RESULTS.md` `eval_gate_status: PASS` (or WAIVED + APPROVALS)
+- Skip TanStack Query invalidation on CRUD
+- Coolify/VPS deploy without explicit user ask
+
+## Traceability
+
+`REQ-XXXX` → `ART-XXXX` → `TC-XXXX` → `VER-XXXX` → append `DECISION_LOG.md`
+
+## Verify (default)
+
+```bash
+npx tsc -b && npx eslint src
+cd backend && npx tsc --noEmit
+npm run build
+```
+
+## Engineering (repo)
+
+Strict TypeScript · shared hooks/services/ui · invalidate all affected query keys on mutations · page width from `App.tsx` `max-w-9xl` only · no Redis/SSR · never commit/push unless asked · SPA + TanStack Query is the cache story
+
+## Hooks
+
+`AGENTS.md` · `.agile-v/ACTIVATION.md` · `.agile-v/SKILLS.md` (24) · `CLAUDE.md` · `docs/PROJECT_WALKTHROUGH.md`

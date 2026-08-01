@@ -2,34 +2,33 @@
 
 **Project:** CodeBook E-Commerce Platform
 **Cycle:** C1 (brownfield-baseline)
-**Updated:** 2026-08-01T05:00:00Z
+**Updated:** 2026-08-01T13:35:00Z
+**HEAD:** pending commit (SEO/lint/docs/env-port sync — REQ-1631…1633)
 
 ## Current Position on the V
 
 ```text
 Specify ──── Constrain ──── Orchestrate (apex) ──── Prove ──── Verify
                                     ▲
-   HERE — Seventh build pass complete (Phase 2 TypeScript/Vite migration,
-   asset restructure, font self-hosting). Self-tested and browser-verified
-   (Prove). Independent/Red Team verification (Verify) not yet run — see
-   "Still blocking before Gate 2" below.
+   HERE — Docs/SEO/lint/env audit pass complete. Pipeline idle for next intent.
+   Coolify deploy deferred. Gate 2 / Red Team optional.
 ```
 
-- **Stage:** 0 — Bootstrap (governance setup) — **complete**
-- **Next stage:** Stage 1 (Requirements) — will activate when the user supplies a new feature/fix intent
-- **Pipeline status:** Idle, ready
-- **Human Gate:** None active. CHECKPOINTS.md CKPT-0001 is **RESOLVED** (decision: leave the pending repo-flatten restructure uncommitted — see below).
+- **Stage:** Pipeline **idle** after Orchestrate/Prove — next entry is Stage 1 (Specify) on new intent, or Stage 4 (Verify) if user asks for Red Team / Gate 2
+- **Pipeline status:** Infinity Loop **ACTIVE**; governance synced 2026-08-01
+- **Human Gate:** None PENDING. CKPT-0001 **RESOLVED + COMMITTED** (`14e53b2`)
 
-## What Happened This Session
+## Session activation (2026-08-01) — resume, not fresh bootstrap
 
-1. No `.agile-v/` existed for this project — this is a first-time bootstrap, not a resume.
-2. Surveyed the live codebase (CRA React 19 frontend + AWS Lambda/DynamoDB backend, Stripe/Cloudinary/Brevo/Shippo integrations) and reconstructed a REQUIREMENTS.md baseline: **45 REQ-IDs across 11 domains** (REQ-0001–REQ-1000), all marked `BASELINE`.
-3. Discovered a **large uncommitted working-tree change already present** in the repo (not made by this session): the former `codebook/` subdirectory's contents (src, aws-lambda, public, lib, scripts, docs, config) have been moved to the repo root, and `codebook-backend-serverless-json-server-archived-reference/` has been deleted. Git sees this as 273 deletions + 16 untracked new paths + 1 modified `.gitignore`. Captured as REQ-1101/1102/1103, status `IN-PROGRESS — UNCOMMITTED`.
-4. No application code was written or modified. Only `.agile-v/` governance files were created.
+1. Loaded `agile-v-core` + `agile-v-pipeline` (+ lifecycle/compliance on demand). Confirmed `.agile-v/` already fully populated from prior C1 work (not empty).
+2. Synced stale governance to live stack: Vite SPA + Express/Prisma (config/PLAYBOOK/POLICY no longer claim CRA/Lambda as primary).
+3. Closed REQ-1101/1102/1103 → **DONE** (commit `14e53b2` already on `origin/main`).
+4. Bootstrapped missing Infinity Loop hooks: `AGENTS.md`, `.agile-v/ACTIVATION.md`, `.agile-v/SKILLS.md`, `.agile-v/skills/` (24 + index), `.cursor/rules/agile-v-infinity-loop.mdc`.
+5. **No application code** written this turn — activation/sync only.
 
 ## Resolved Checkpoint
 
-**CKPT-0001** — Resolved 2026-07-30: repo-flatten restructure (REQ-1101/1102/1103) stays **uncommitted** until you explicitly ask to commit it. No git add/commit/checkout/reset will run against those paths without a fresh instruction. REQ-1101/1102/1103 remain `IN-PROGRESS — UNCOMMITTED`.
+**CKPT-0001** — Initially (2026-07-30): leave restructure uncommitted. Later (2026-08-01): user authorized commit/push → included in `14e53b2`. REQ-1101/1102/1103 **DONE**.
 
 ## Phase 1 Build Status (2026-07-30) — Orchestrate/Prove in progress
 
@@ -158,7 +157,13 @@ User asked for a fresh deep audit of the whole codebase toward "ready for deploy
 
 ## Ready For
 
-Continue Orchestrate on whatever the user directs next. Page-redesign initiative is now fully complete across every domain named in the user's original ask: Products (REQ-1616), Orders (REQ-1617), Users (REQ-1618 — address book + order history), and Tickets/Reviews (REQ-1619 — triage metadata, order-linked tickets, review store-responses, Reviews' first admin detail page). Other remaining open items: RippleButton wider rollout (REQ-1607, partial), deeper nested KPI-card conversion (REQ-1608, partial), checkout not yet wired to the new address book (deliberately deferred, see DECISION_LOG.md 00:30:03Z), Coolify/VPS deployment (explicitly deferred) → Stage 4 (Red Team Verifier / independent review) before Gate 2 → Stage 5, logging every step to these files.
+**Idle — Infinity Loop active.** Await next user instruction:
+
+1. **New feature / fix** → Specify (new `REQ-XXXX`) → Constrain → Gate 1 → Orchestrate (`build-agent-js`)
+2. **Independent verify** → Stage 4 Red Team on shipped REQ-1200…1630 → Gate 2
+3. **Deploy** → only if user explicitly asks (REQ-1201/1210–1212)
+
+Shipped locally (Phases 1–6): Express+Prisma backend, Vite/TS frontend, Google OAuth, AI insights, address book + checkout wiring, page enrichment (products/orders/users/tickets/reviews), Sentry tunnel, cache/invalidation polish. Open optional: REQ-1400 (`queryKeys` module), REQ-1403 (Redis YAGNI), REQ-1615 (Vercel headers when deploy in scope).
 
 ## Ninth pass — multi-model AI Business Insights (REQ-1613), new session (2026-07-31)
 

@@ -5,14 +5,26 @@
   "cycle": "C1",
   "cycle_type": "brownfield-baseline",
   "created": "2026-07-30",
+  "updated": "2026-08-01",
+  "head": "edae3e1",
   "stack": {
-    "frontend": "React 19 (Create React App / react-scripts 5) + React Router 7 + TanStack Query 5 + Tailwind CSS 3",
+    "frontend": "React 19 + Vite (Rolldown) + TypeScript strict + React Router 7 + TanStack Query 5 + Tailwind CSS 3",
     "payments": "Stripe (@stripe/react-stripe-js, @stripe/stripe-js)",
-    "backend": "AWS Lambda (Node.js) + HTTP API Gateway",
-    "data": "AWS DynamoDB (@aws-sdk/client-dynamodb, lib-dynamodb)",
-    "auth": "JWT (jsonwebtoken) + bcryptjs, role-based access control",
-    "hosting": "Vercel (frontend)",
-    "integrations": ["Cloudinary (images)", "Brevo (email)", "Shippo (shipping labels)"]
+    "backend": "Express.js (Node) + Prisma + PostgreSQL",
+    "auth": "JWT (jsonwebtoken) + bcryptjs + Google OAuth2, role-based access control",
+    "hosting": {
+      "frontend": "Vercel (planned; local-only so far)",
+      "backend": "Coolify/Hetzner VPS (intentionally deferred)"
+    },
+    "integrations": [
+      "Cloudinary (images)",
+      "Brevo (email)",
+      "Shippo (shipping labels)",
+      "Google OAuth",
+      "9 free-tier LLM providers (AI insights)",
+      "Sentry (tunneled via /api/monitoring)"
+    ],
+    "reference_only": "aws-lambda/ (retired AWS Lambda+DynamoDB backend)"
   },
   "active_domain_skill": "build-agent-js",
   "req_id_format": "REQ-####",
@@ -28,15 +40,18 @@
     "0800-0899": "Admin Dashboard & Analytics",
     "0900-0999": "Email / Transactional Messaging",
     "1000-1099": "Activity Logging / Audit Trail",
-    "1100-1199": "Repo Restructure / Infra Migration (open thread)",
-    "1200-1299": "Backend Platform Migration (AWS Lambda+DynamoDB -> Express+Postgres on VPS)",
-    "1300-1399": "TypeScript Migration (frontend + backend)",
+    "1100-1199": "Repo Restructure / Infra Migration",
+    "1200-1299": "Backend Platform Migration (AWS Lambda+DynamoDB -> Express+Postgres)",
+    "1300-1399": "TypeScript + Vite Migration",
     "1400-1499": "Cache / Invalidation / Realtime UX Contract",
-    "1500-1599": "Google OAuth Sign-In (new feature)",
-    "1600-1699": "UI/UX Consistency (toasts, confirmations, content quality, demo login)"
+    "1500-1599": "Google OAuth Sign-In",
+    "1600-1699": "UI/UX / enrichment / monitoring (through REQ-1630)"
   },
   "policy_profile": "lightweight-solo",
   "gate2_default": "WAIVED for R0/R1 (UI, docs, styling); REQUIRED for R2/R3 (auth, payments, data-destructive, infra)",
   "compliance_auditor_active": true,
-  "red_team_verifier_active": true
+  "red_team_verifier_active": true,
+  "infinity_loop_active": true,
+  "skills_index": ".agile-v/skills/SKILLS_INDEX.md",
+  "activation": ".agile-v/ACTIVATION.md"
 }

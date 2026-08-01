@@ -2,8 +2,8 @@
 
 **Project:** CodeBook E-Commerce Platform
 **Cycle:** C1 (brownfield-baseline)
-**Updated:** 2026-08-01T13:35:00Z
-**HEAD:** pending commit (SEO/lint/docs/env-port sync — REQ-1631…1633)
+**Updated:** 2026-08-01T13:40:00Z
+**HEAD:** `949d846` (`main` == `origin/main`)
 
 ## Current Position on the V
 

@@ -1,6 +1,6 @@
 export const ProductCardSkeleton = () => {
   return (
-    <div className="m-3 max-w-sm w-full bg-white rounded-lg border border-gray-200 shadow-md dark:bg-gray-800 dark:border-gray-700">
+    <div className="m-3 flex h-full max-w-sm w-full flex-col bg-white rounded-lg border border-gray-200 shadow-md dark:bg-gray-800 dark:border-gray-700">
       {/* Image Skeleton - matches exact structure with Link wrapper */}
       <div className="relative">
         {/* Best Seller Badge Skeleton - positioned exactly like real badge (top-4 left-2 px-2) */}
@@ -10,7 +10,7 @@ export const ProductCardSkeleton = () => {
       </div>
 
       {/* Content wrapper - exact same padding (p-5) */}
-      <div className="p-5">
+      <div className="flex flex-1 flex-col p-5">
         {/* Title Skeleton - matches Link wrapper with h5 text-2xl font-medium tracking-tight (mb-2) - text-2xl with font-medium has larger line-height */}
         <div className="mb-2 h-10 w-full bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></div>
 
@@ -36,7 +36,7 @@ export const ProductCardSkeleton = () => {
         </div>
 
         {/* Price and Button Skeleton - matches flex justify-between items-center */}
-        <p className="flex justify-between items-center">
+        <p className="mt-auto flex justify-between items-center">
           {/* Price Skeleton - matches text-2xl span with $ and price */}
           <span className="text-2xl">
             <span className="inline-block h-8 w-16 bg-gray-300 dark:bg-gray-700 rounded animate-pulse"></span>

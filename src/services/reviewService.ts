@@ -211,6 +211,38 @@ export async function getReviewById(reviewId: string): Promise<Review> {
   return response.json();
 }
 
+// Parent: REQ-1651 — on-demand AI sentiment/moderation-flag check, run per
+// admin click, not automatically on every review (keeps LLM cost/latency
+// opt-in, analyzes the review's real persisted text server-side).
+export interface ReviewSentimentResult {
+  sentiment: "positive" | "neutral" | "negative";
+  flagged: boolean;
+  reason: string | null;
+  provider: string;
+}
+
+export async function analyzeReviewSentiment(reviewId: string): Promise<ReviewSentimentResult> {
+  const token = getToken();
+
+  if (!token) {
+    throw new Error("User not authenticated");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/admin/reviews/${reviewId}/analyze-sentiment`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await extractErrorMessage(response));
+  }
+
+  return response.json();
+}
+
 // Parent: REQ-1619 — admin public "store response" to a review. `null` clears the reply.
 export async function replyToReview(reviewId: string, adminReply: string | null): Promise<Review> {
   const token = getToken();

@@ -7,7 +7,7 @@
 
 import { ApiError } from "./apiError";
 import { API_BASE_URL } from "../lib/apiBase";
-import type { ActivityLog, AdminUserDetail, Order, Product, User } from "../types";
+import type { ActivityLog, AdminUserDetail, Order, OrderWithTimeline, Product, User } from "../types";
 
 interface Session {
   token: string | null;
@@ -172,13 +172,15 @@ export async function deleteProduct(productId: string): Promise<{ message: strin
   return response.json();
 }
 
-export async function updateOrderStatus(orderId: string, status: string): Promise<Order> {
+export async function updateOrderStatus(orderId: string, status: string, reason?: string): Promise<Order> {
   const browserData = requireAdminSession();
 
   const response = await fetch(`${API_BASE_URL}/admin/orders/${orderId}/status`, {
     method: "PUT",
     headers: authHeaders(browserData.token),
-    body: JSON.stringify({ status }),
+    // reason (REQ-1643) is an audit-log note only — the backend never forwards
+    // it to Stripe's own reason enum (see orders.routes.ts toStripeRefundReason).
+    body: JSON.stringify({ status, reason }),
   });
 
   if (!response.ok) {
@@ -266,7 +268,7 @@ export async function addTrackingNumber(
   return response.json();
 }
 
-export async function getOrderById(orderId: string): Promise<Order> {
+export async function getOrderById(orderId: string): Promise<OrderWithTimeline> {
   const browserData = requireAdminSession();
 
   const response = await fetch(`${API_BASE_URL}/admin/orders/${orderId}`, {
@@ -348,6 +350,17 @@ export interface CatalogHealth {
   outOfStockProducts: number;
 }
 
+// REQ-1648 — deterministic restock-velocity projection (days until stockout
+// from recent order velocity), not an LLM call: a numeric projection like this
+// is more reliable and explainable as plain math than as a model guess.
+export interface RestockForecastEntry {
+  productId: string;
+  productName: string;
+  stock: number;
+  dailyVelocity: number;
+  daysUntilStockout: number;
+}
+
 export interface AdminStats {
   totalOrders: number;
   totalRevenue: number;
@@ -364,6 +377,7 @@ export interface AdminStats {
   productsByLanguage: Array<[string, number]>;
   topRatedProducts: TopRatedProduct[];
   catalogHealth: CatalogHealth;
+  restockForecast: RestockForecastEntry[];
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
@@ -448,6 +462,35 @@ export async function getAdminStats(): Promise<AdminStats> {
     const inStockProducts = products.filter((product) => product.in_stock).length;
     const outOfStockProducts = totalProducts - inStockProducts;
 
+    // Restock forecast (REQ-1648) — units sold per product in the last 30 days
+    // (from the same orders already fetched above) projected against current
+    // stock. Only surfaces products actually selling AND running low soon —
+    // an unsold product with 5 left isn't at risk, so it's excluded.
+    const RESTOCK_WINDOW_DAYS = 30;
+    const RESTOCK_ALERT_THRESHOLD_DAYS = 60;
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - RESTOCK_WINDOW_DAYS);
+    const unitsSoldByProduct = new Map<string, number>();
+    for (const order of orders) {
+      if (!order.createdAt || new Date(order.createdAt) < windowStart) continue;
+      if (!Array.isArray(order.cartList)) continue;
+      for (const item of order.cartList) {
+        if (!item.id) continue;
+        unitsSoldByProduct.set(item.id, (unitsSoldByProduct.get(item.id) || 0) + (item.quantity || 1));
+      }
+    }
+    const restockForecast: RestockForecastEntry[] = products
+      .filter((product) => product.stock != null)
+      .map((product) => {
+        const unitsSold = unitsSoldByProduct.get(product.id) || 0;
+        const dailyVelocity = unitsSold / RESTOCK_WINDOW_DAYS;
+        const daysUntilStockout = dailyVelocity > 0 ? (product.stock as number) / dailyVelocity : Infinity;
+        return { productId: product.id, productName: product.name, stock: product.stock as number, dailyVelocity, daysUntilStockout };
+      })
+      .filter((entry) => Number.isFinite(entry.daysUntilStockout) && entry.daysUntilStockout <= RESTOCK_ALERT_THRESHOLD_DAYS)
+      .sort((a, b) => a.daysUntilStockout - b.daysUntilStockout)
+      .slice(0, 10);
+
     return {
       totalOrders,
       totalRevenue,
@@ -467,6 +510,7 @@ export async function getAdminStats(): Promise<AdminStats> {
         inStockProducts,
         outOfStockProducts,
       },
+      restockForecast,
     };
   } catch (error) {
     // Re-throw ApiError as-is, wrap others
@@ -523,6 +567,31 @@ export async function getAiInsights(summary: string): Promise<AiInsightsResult> 
     method: "POST",
     headers: authHeaders(browserData.token),
     body: JSON.stringify({ summary }),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response), response.status);
+  }
+
+  return response.json();
+}
+
+// REQ-1654 — on-demand consolidated stock digest (rollup instead of a ping
+// per order); admin-triggered rather than a scheduled job (adding a
+// scheduler would be new backend infra beyond this pass's scope).
+export interface LowStockDigestResult {
+  message: string;
+  lowStockCount: number;
+  outOfStockCount: number;
+  messageId: string;
+}
+
+export async function sendLowStockDigest(): Promise<LowStockDigestResult> {
+  const browserData = requireAdminSession();
+
+  const response = await fetch(`${API_BASE_URL}/admin/notifications/low-stock-digest`, {
+    method: "POST",
+    headers: authHeaders(browserData.token),
   });
 
   if (!response.ok) {

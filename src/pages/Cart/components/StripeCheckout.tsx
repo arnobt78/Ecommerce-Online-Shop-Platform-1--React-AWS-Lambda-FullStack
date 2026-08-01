@@ -491,13 +491,7 @@ export const StripeCheckout = ({ setCheckout }: StripeCheckoutProps) => {
     // Create payment intent using React Query mutation (only once)
     paymentIntentCreatedRef.current = true; // Mark as attempted immediately
     createPaymentIntentMutation.mutate({
-      amount: totalRef.current,
       cartList: cartListRef.current,
-      user: {
-        id: userRef.current.id,
-        email: userRef.current.email,
-        name: userRef.current.name ?? undefined,
-      },
     });
     // Note: createPaymentIntentMutation and setCheckout are stable (from React Query and useState),
     // so including them in dependencies won't cause unnecessary re-runs

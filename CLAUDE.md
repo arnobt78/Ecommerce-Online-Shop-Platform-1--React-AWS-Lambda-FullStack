@@ -33,6 +33,10 @@ eBook storefront + admin: catalog, cart, Stripe, addresses, orders, reviews, tic
 - Schema changes: this project uses `prisma db push`, not `prisma migrate` (no migrations folder) — never offer `migrate dev`'s DB reset
 - Book-cover art (`Product.coverColor`): never assign white/near-white (luminance check, threshold ~230/255) — hides `BookCoverSvg`'s white spine-curl lines
 - `ProductReel` auto-scrolls via `requestAnimationFrame` + direct `transform`, not `scrollBy`/interval — keep it that way for smooth continuous motion, not discrete jumps
+- `Order.paymentIntentId` is `@unique` (nullable-safe) — order creation is idempotent by design; never remove this constraint
+- Stripe's refund `reason` param is a fixed 3-value enum (`duplicate`/`fraudulent`/`requested_by_customer`), NOT free text — admin-entered cancel/refund reasons are audit-log notes only, see `toStripeRefundReason()` in `orders.routes.ts`
+- "AI-driven" admin features (restock/fraud/pricing/churn) are deterministic math, not LLM calls — only review-sentiment and the existing AI Insights panel actually call the LLM chain
+- `POST /email/send` restricts non-admin callers' `to` to their own email or the fixed admin alert address (was an open relay) — admins exempt
 
-## Status (2026-08-01)
-C1 Phases 1–7 done (REQ-1200…1636). Catalog fully replaced with the 17 books merged from user's separate `university-library` project (original 15 CodeBook products removed) — book-cover art/trailer video/recommendations reel + admin catalog insights, live cover-preview editor in admin ProductForm, `ProductDetail` completely redesigned (clean hierarchy, no pill-wall). Coolify/VPS deferred. Live demo still legacy AWS (`codebook-aws.vercel.app`). Gate 2 / Red Team optional. Lint+tsc clean FE+BE.
+## Status (2026-08-02)
+C1 Phases 1–8 done + audited (REQ-1200…1655). Catalog: 17 books (university-library merge). Book-cover art/trailer video/recommendations reel + admin catalog insights, live cover-preview editor, `ProductDetail` redesigned. Phase 8: payment-tampering fix, auto-refund-on-cancel, invoice download, order idempotency, payment/order rate limiting, per-entity admin analytics, deterministic restock/fraud/pricing/churn signals, on-demand AI review-sentiment, admin low-stock digest. Post-audit (REQ-1655): re-verified invalidation/auth/zod/dead-code across Phase 8, fixed the `/email/send` open-relay gap. Coolify/VPS deferred. Live demo still legacy AWS (`codebook-aws.vercel.app`). Gate 2 / Red Team optional. Lint+tsc+build clean FE+BE (full sweep).

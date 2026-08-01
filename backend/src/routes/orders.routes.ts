@@ -7,17 +7,95 @@ import express, { type Request, type Response } from "express";
 import Stripe from "stripe";
 import { successResponse, errorResponse } from "../lib/response";
 import { requireAuth, requireAdmin } from "../lib/auth";
+import { paymentLimiter } from "../lib/rateLimit";
 import { logActivity, getOrderActivityTimeline } from "../services/activityLog.service";
 import * as ordersService from "../services/orders.service";
 import { createOrderSchema } from "../services/orders.service";
 import { incrementProductStock } from "../services/products.service";
 import { generateShippoLabel } from "../services/shipping.service";
+import { generateInvoicePdf } from "../services/invoice.service";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 export const publicRouter = express.Router();
 export const adminRouter = express.Router();
+
+interface RefundResult {
+  updatedOrder: Awaited<ReturnType<typeof ordersService.updateOrderWithRefund>>;
+  refund: Stripe.Response<Stripe.Refund>;
+  stockRestoreResults: Array<Record<string, unknown>>;
+}
+
+// Stripe's own `reason` param is a fixed 3-value enum for its dispute/reporting
+// tooling — it is NOT a free-text field. The admin-facing "reason" (REQ-1643,
+// e.g. "customer requested shipping delay refund") is our own audit-log note
+// and must never be forwarded to Stripe as-is, or the API call 400s.
+const STRIPE_REFUND_REASONS = new Set<Stripe.RefundCreateParams.Reason>(["duplicate", "fraudulent", "requested_by_customer"]);
+function toStripeRefundReason(reason?: string): Stripe.RefundCreateParams.Reason {
+  return reason && STRIPE_REFUND_REASONS.has(reason as Stripe.RefundCreateParams.Reason) ? (reason as Stripe.RefundCreateParams.Reason) : "requested_by_customer";
+}
+
+// Shared by the explicit "Process Refund" action and by cancelling a paid
+// order (REQ-1639/1643) — a paid order that's cancelled must actually return
+// the customer's money via the same Stripe flow, not just flip a status text.
+async function refundOrderPayment(
+  order: NonNullable<Awaited<ReturnType<typeof ordersService.getOrderById>>>,
+  options: { amount?: number; reason?: string }
+): Promise<RefundResult> {
+  if (!stripe) throw new Error("Payment service is not configured. Please contact support.");
+
+  const paymentIntentId = order.paymentIntentId;
+  if (!paymentIntentId) throw new Error("Order does not have a payment intent ID. Cannot process refund.");
+
+  const wasAlreadyCancelled = order.status === "cancelled";
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  const chargeId = paymentIntent.latest_charge;
+  if (!chargeId) throw new Error("Payment intent does not have a charge. Cannot process refund.");
+
+  const refundParams: Stripe.RefundCreateParams = {
+    charge: typeof chargeId === "string" ? chargeId : chargeId.id,
+    reason: toStripeRefundReason(options.reason),
+  };
+  if (options.amount && options.amount > 0) {
+    const orderAmountInCents = Math.round((order.amount_paid || 0) * 100);
+    if (options.amount > orderAmountInCents) {
+      throw new Error(`Refund amount (${options.amount} cents) exceeds order amount (${orderAmountInCents} cents)`);
+    }
+    refundParams.amount = options.amount;
+  }
+
+  const refund = await stripe.refunds.create(refundParams);
+
+  const stockRestoreResults: Array<Record<string, unknown>> = [];
+  const cartList = order.cartList as Array<{ id?: string; name?: string; productName?: string; quantity?: number }>;
+  if (!wasAlreadyCancelled && Array.isArray(cartList)) {
+    for (const item of cartList) {
+      if (!item.id || !item.quantity) continue;
+      try {
+        const updatedProduct = await incrementProductStock(item.id, item.quantity);
+        stockRestoreResults.push({
+          productId: item.id,
+          productName: item.name || item.productName || "Product",
+          quantity: item.quantity,
+          newStock: updatedProduct.stock,
+          success: true,
+        });
+      } catch (stockError) {
+        stockRestoreResults.push({
+          productId: item.id,
+          productName: item.name || item.productName || "Product",
+          quantity: item.quantity,
+          success: false,
+          error: stockError instanceof Error ? stockError.message : String(stockError),
+        });
+      }
+    }
+  }
+
+  const updatedOrder = await ordersService.updateOrderWithRefund(order.id, refund.id, refund.amount);
+  return { updatedOrder, refund, stockRestoreResults };
+}
 
 // GET /orders — always the authenticated user's own orders (dashboard), regardless of role.
 // Parity with functions/orders/index.js GET.
@@ -56,8 +134,42 @@ publicRouter.get("/orders/:id", requireAuth, async (req: Request, res: Response)
   }
 });
 
+// GET /orders/:id/invoice — REQ-1640: on-demand PDF download, reusing the
+// same generateInvoicePdf() the order-confirmation email already attaches
+// (REQ-1612) instead of a separate invoice-storage system.
+publicRouter.get("/orders/:id/invoice", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const orderId = req.params.id!;
+    const order = await ordersService.getOrderById(orderId);
+    if (!order) return errorResponse(res, "Order not found", 404);
+
+    if (order.userId !== req.user!.id && req.user!.role !== "admin") {
+      return errorResponse(res, "Unauthorized: Cannot access another user's order", 403);
+    }
+
+    const orderUser = order.user as { name?: string; email?: string } | null;
+    const cartList = Array.isArray(order.cartList) ? (order.cartList as Array<{ name?: string; productName?: string; quantity?: number; price?: number }>) : [];
+
+    const pdfBuffer = await generateInvoicePdf({
+      orderId: order.id,
+      orderDate: order.createdAt ? new Date(order.createdAt).toLocaleDateString() : undefined,
+      customerName: orderUser?.name,
+      customerEmail: orderUser?.email,
+      items: cartList,
+      total: order.amount_paid,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="invoice-${order.id}.pdf"`);
+    return res.send(pdfBuffer);
+  } catch (error) {
+    console.error("Invoice generation error:", error);
+    return errorResponse(res, { message: error instanceof Error ? error.message : "Failed to generate invoice" }, 500);
+  }
+});
+
 // POST /orders — parity with functions/orders/index.js POST.
-publicRouter.post("/orders", requireAuth, async (req: Request, res: Response) => {
+publicRouter.post("/orders", paymentLimiter, requireAuth, async (req: Request, res: Response) => {
   try {
     const parsed = createOrderSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -66,7 +178,25 @@ publicRouter.post("/orders", requireAuth, async (req: Request, res: Response) =>
     if (parsed.data.user.id !== req.user!.id) {
       return errorResponse(res, "Unauthorized: User ID mismatch", 403);
     }
-    const order = await ordersService.createOrder(parsed.data);
+
+    // Security: amount_paid must reflect what Stripe actually charged, not
+    // whatever the client sends — verified against the PaymentIntent instead
+    // of trusted from the request body (mirrors the recomputation done at
+    // charge time in payment.routes.ts).
+    let amountPaid = parsed.data.amount_paid;
+    if (parsed.data.paymentIntentId) {
+      if (!stripe) return errorResponse(res, "Payment service is not configured. Please contact support.", 500);
+      const paymentIntent = await stripe.paymentIntents.retrieve(parsed.data.paymentIntentId);
+      if (paymentIntent.metadata?.userId !== req.user!.id) {
+        return errorResponse(res, "Payment intent does not belong to this user", 403);
+      }
+      if (paymentIntent.status !== "succeeded") {
+        return errorResponse(res, "Payment has not succeeded yet", 400);
+      }
+      amountPaid = paymentIntent.amount / 100;
+    }
+
+    const order = await ordersService.createOrder({ ...parsed.data, amount_paid: amountPaid });
     return successResponse(res, order, 201);
   } catch (error) {
     console.error("Order create error:", error);
@@ -90,7 +220,10 @@ adminRouter.get("/admin/orders/:id", requireAuth, requireAdmin, async (req: Requ
   try {
     const order = await ordersService.getOrderById(req.params.id!);
     if (!order) return errorResponse(res, "Order not found", 404);
-    return successResponse(res, order);
+    // REQ-1646: admins previously had no timeline visibility at all — only the
+    // customer-facing GET /orders/:id included it. Same call, same shape.
+    const timeline = await getOrderActivityTimeline(req.params.id!);
+    return successResponse(res, { ...order, timeline });
   } catch (error) {
     console.error("Admin order detail error:", error);
     return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
@@ -101,11 +234,49 @@ adminRouter.get("/admin/orders/:id", requireAuth, requireAdmin, async (req: Requ
 adminRouter.put("/admin/orders/:id/status", requireAuth, requireAdmin, async (req: Request, res: Response) => {
   try {
     const orderId = req.params.id!;
-    const { status } = req.body || {};
-    if (!status) return errorResponse(res, "Status is required", 400);
+    const { status, reason: rawReason } = (req.body || {}) as { status?: unknown; reason?: unknown };
+    if (!status || typeof status !== "string") return errorResponse(res, "Status is required", 400);
+    const reason = typeof rawReason === "string" ? rawReason : undefined;
 
     const existingOrder = await ordersService.getOrderById(orderId);
     if (!existingOrder) return errorResponse(res, "Order not found", 404);
+
+    // REQ-1639: cancelling an order that's already been paid must actually
+    // return the customer's money, not just relabel the order — reuses the
+    // exact same Stripe refund flow as the explicit "Process Refund" action
+    // instead of leaving a "cancelled" order that silently kept the payment.
+    const isCancellingPaidOrder =
+      status === "cancelled" && existingOrder.paymentStatus === "paid" && existingOrder.status !== "refunded" && !!existingOrder.paymentIntentId;
+
+    if (isCancellingPaidOrder) {
+      const { updatedOrder, refund, stockRestoreResults } = await refundOrderPayment(existingOrder, { reason });
+
+      logActivity({
+        userId: req.user!.id,
+        userEmail: req.user!.email,
+        userName: req.user!.name,
+        action: "status_change",
+        entityType: "order",
+        entityId: orderId,
+        details: {
+          previousStatus: existingOrder.status,
+          newStatus: "refunded",
+          refundId: refund.id,
+          refundAmount: refund.amount,
+          reason: reason || null,
+          cancelledWithRefund: true,
+          orderId,
+        },
+      });
+
+      return successResponse(res, {
+        ...updatedOrder,
+        refundId: refund.id,
+        refundAmount: refund.amount,
+        refundStatus: refund.status,
+        _stockRestores: stockRestoreResults,
+      });
+    }
 
     const updatedOrder = await ordersService.updateOrderStatus(orderId, status);
 
@@ -116,7 +287,7 @@ adminRouter.put("/admin/orders/:id/status", requireAuth, requireAdmin, async (re
       action: "status_change",
       entityType: "order",
       entityId: orderId,
-      details: { previousStatus: existingOrder.status, newStatus: status, orderId },
+      details: { previousStatus: existingOrder.status, newStatus: status, reason: reason || null, orderId },
     });
 
     return successResponse(res, updatedOrder);
@@ -269,63 +440,15 @@ adminRouter.post("/admin/orders/:id/refund", requireAuth, requireAdmin, async (r
     if (order.paymentStatus === "refunded" || order.status === "refunded") {
       return errorResponse(res, "Order has already been refunded", 400);
     }
-
-    const paymentIntentId = order.paymentIntentId;
-    if (!paymentIntentId) {
+    if (!order.paymentIntentId) {
       return errorResponse(res, "Order does not have a payment intent ID. Cannot process refund.", 400);
     }
 
-    const wasAlreadyCancelled = order.status === "cancelled";
-    const { amount, reason } = req.body || {};
-
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    const chargeId = paymentIntent.latest_charge;
-    if (!chargeId) {
-      return errorResponse(res, "Payment intent does not have a charge. Cannot process refund.", 400);
-    }
-
-    const refundParams: Stripe.RefundCreateParams = {
-      charge: typeof chargeId === "string" ? chargeId : chargeId.id,
-      reason: reason || "requested_by_customer",
-    };
-    if (amount && typeof amount === "number" && amount > 0) {
-      const orderAmountInCents = Math.round((order.amount_paid || 0) * 100);
-      if (amount > orderAmountInCents) {
-        return errorResponse(res, `Refund amount (${amount} cents) exceeds order amount (${orderAmountInCents} cents)`, 400);
-      }
-      refundParams.amount = amount;
-    }
-
-    const refund = await stripe.refunds.create(refundParams);
-
-    const stockRestoreResults: Array<Record<string, unknown>> = [];
-    const cartList = order.cartList as Array<{ id?: string; name?: string; productName?: string; quantity?: number }>;
-    if (!wasAlreadyCancelled && Array.isArray(cartList)) {
-      for (const item of cartList) {
-        if (!item.id || !item.quantity) continue;
-        try {
-          const updatedProduct = await incrementProductStock(item.id, item.quantity);
-          stockRestoreResults.push({
-            productId: item.id,
-            productName: item.name || item.productName || "Product",
-            quantity: item.quantity,
-            newStock: updatedProduct.stock,
-            success: true,
-          });
-        } catch (stockError) {
-          stockRestoreResults.push({
-            productId: item.id,
-            productName: item.name || item.productName || "Product",
-            quantity: item.quantity,
-            success: false,
-            error: stockError instanceof Error ? stockError.message : String(stockError),
-          });
-        }
-      }
-    }
-
-    const refundAmount = refund.amount;
-    const updatedOrder = await ordersService.updateOrderWithRefund(orderId, refund.id, refundAmount);
+    const { amount, reason } = (req.body || {}) as { amount?: unknown; reason?: unknown };
+    const { updatedOrder, refund, stockRestoreResults } = await refundOrderPayment(order, {
+      amount: typeof amount === "number" ? amount : undefined,
+      reason: typeof reason === "string" ? reason : undefined,
+    });
 
     logActivity({
       userId: req.user!.id,
@@ -338,16 +461,17 @@ adminRouter.post("/admin/orders/:id/refund", requireAuth, requireAdmin, async (r
         previousStatus: order.status,
         newStatus: "refunded",
         refundId: refund.id,
-        refundAmount,
-        paymentIntentId,
+        refundAmount: refund.amount,
+        paymentIntentId: order.paymentIntentId,
         orderId,
+        reason: reason || null,
       },
     });
 
     return successResponse(res, {
       ...updatedOrder,
       refundId: refund.id,
-      refundAmount,
+      refundAmount: refund.amount,
       refundStatus: refund.status,
       _stockRestores: stockRestoreResults,
     });

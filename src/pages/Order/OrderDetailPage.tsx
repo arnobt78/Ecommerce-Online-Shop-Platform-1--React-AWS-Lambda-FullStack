@@ -8,14 +8,16 @@
  * already written by every admin order action — no new schema needed).
  */
 
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calendar, Package, CheckCircle2, Clock, XCircle, RefreshCcw, Truck, Sparkles } from "lucide-react";
+import { ArrowLeft, Calendar, Download } from "lucide-react";
 import { useTitle } from "../../hooks/useTitle";
 import { useOrderDetail } from "../../hooks/useUser";
-import { Card, StatusBadge, LoadingState, ErrorState, OrderTrackingInfo } from "../../components/ui";
+import { Card, StatusBadge, LoadingState, ErrorState, OrderTrackingInfo, OrderTimeline, RippleButton } from "../../components/ui";
 import { getProductImageUrl, getProductImageKey } from "../../utils/productImage";
 import { formatPrice } from "../../utils/formatPrice";
-import type { ActivityLog, OrderStatus } from "../../types";
+import { downloadOrderInvoice } from "../../services";
+import { toast } from "../../lib/toast";
 
 function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return "Date not available";
@@ -32,30 +34,10 @@ function formatDateTime(dateString: string | null | undefined): string {
   }
 }
 
-const TIMELINE_ICON: Record<string, typeof CheckCircle2> = {
-  pending: Clock,
-  processing: Package,
-  shipped: Truck,
-  delivered: CheckCircle2,
-  cancelled: XCircle,
-  refunded: RefreshCcw,
-};
-
-function timelineLabel(entry: ActivityLog): string {
-  const details = entry.details as { newStatus?: string; trackingNumber?: string; refundAmount?: number; labelGenerated?: boolean };
-  const status = details.newStatus || "updated";
-  if (status === "shipped" && details.trackingNumber) {
-    return details.labelGenerated ? "Shipping label generated and order marked shipped" : `Order shipped (tracking: ${details.trackingNumber})`;
-  }
-  if (status === "refunded" && details.refundAmount) {
-    return `Order refunded ($${(details.refundAmount / 100).toFixed(2)})`;
-  }
-  return `Order marked ${status}`;
-}
-
 const OrderDetailContent = ({ orderId }: { orderId: string }) => {
   const navigate = useNavigate();
   const { data: order, isLoading, error } = useOrderDetail(orderId);
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
 
   useTitle(order ? `Order ${order.id.slice(0, 8)}` : "Order Details");
 
@@ -63,6 +45,22 @@ const OrderDetailContent = ({ orderId }: { orderId: string }) => {
   if (error || !order) return <main><ErrorState message={error?.message || "Order not found"} /></main>;
 
   const itemCount = order.cartList?.reduce((sum, item) => sum + (item.quantity || 1), 0) || order.quantity || 0;
+
+  // REQ-1640: reuses the same PDF the order-confirmation email already
+  // attaches — no separate invoice-storage system, generated on demand.
+  const handleDownloadInvoice = async () => {
+    setIsDownloadingInvoice(true);
+    try {
+      await downloadOrderInvoice(orderId);
+    } catch (downloadError) {
+      toast.error(downloadError instanceof Error ? downloadError.message : "Failed to download invoice", {
+        closeButton: true,
+        position: "bottom-right",
+      });
+    } finally {
+      setIsDownloadingInvoice(false);
+    }
+  };
 
   return (
     <main className="py-8 space-y-6">
@@ -79,10 +77,20 @@ const OrderDetailContent = ({ orderId }: { orderId: string }) => {
           <h1 className="text-2xl sm:text-3xl font-medium text-gray-700 dark:text-white">Order Details</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 font-mono mt-1">{order.id}</p>
         </div>
-        <StatusBadge
-          status={order.status || "pending"}
-          customLabels={{ pending: "Pending", processing: "Processing", shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled", refunded: "Refunded" }}
-        />
+        <div className="flex items-center gap-3">
+          <StatusBadge
+            status={order.status || "pending"}
+            customLabels={{ pending: "Pending", processing: "Processing", shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled", refunded: "Refunded" }}
+          />
+          <RippleButton
+            onClick={handleDownloadInvoice}
+            disabled={isDownloadingInvoice}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="h-4 w-4" strokeWidth={2} />
+            {isDownloadingInvoice ? "Downloading..." : "Download Invoice"}
+          </RippleButton>
+        </div>
       </div>
 
       {/* Summary */}
@@ -144,39 +152,8 @@ const OrderDetailContent = ({ orderId }: { orderId: string }) => {
         </div>
       </Card>
 
-      {/* Status timeline (REQ-1617) */}
-      <Card className="p-4 sm:p-6">
-        <h2 className="text-lg font-medium text-gray-700 dark:text-white mb-4 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-violet-500" strokeWidth={2} />
-          Order Timeline
-        </h2>
-        <ol className="space-y-4">
-          <li className="flex items-start gap-3">
-            <span className="flex-shrink-0 h-8 w-8 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center">
-              <Package className="h-4 w-4 text-sky-600 dark:text-sky-400" strokeWidth={2} />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-white">Order placed</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{formatDateTime(order.createdAt)}</p>
-            </div>
-          </li>
-          {order.timeline.map((entry) => {
-            const details = entry.details as { newStatus?: string };
-            const Icon = TIMELINE_ICON[details.newStatus as OrderStatus] || CheckCircle2;
-            return (
-              <li key={entry.id} className="flex items-start gap-3">
-                <span className="flex-shrink-0 h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                  <Icon className="h-4 w-4 text-gray-600 dark:text-gray-400" strokeWidth={2} />
-                </span>
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-white">{timelineLabel(entry)}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{formatDateTime(entry.createdAt)}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </Card>
+      {/* Status/refund/tracking timeline (REQ-1617, shared with the admin order detail page — REQ-1646) */}
+      <OrderTimeline createdAt={order.createdAt} timeline={order.timeline} />
 
       {/* Shipping & tracking (reuses the existing component from the Dashboard order card) */}
       <OrderTrackingInfo order={order} />

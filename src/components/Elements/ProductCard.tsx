@@ -43,7 +43,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   }, [cartList, product.id]);
 
   return (
-    <div className="m-3 max-w-sm bg-white rounded-lg border border-gray-200 shadow-md dark:bg-gray-800 dark:border-gray-700">
+    <div className="m-3 flex h-full max-w-sm flex-col bg-white rounded-lg border border-gray-200 shadow-md dark:bg-gray-800 dark:border-gray-700">
       <Link to={`/products/${id}`} className="relative" onMouseEnter={seedProductDetailCache}>
         {best_seller && (
           <span className="absolute top-4 left-2 px-2 bg-orange-500 bg-opacity-90 text-white rounded">
@@ -90,7 +90,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           )
         )}
       </Link>
-      <div className="p-5">
+      <div className="flex flex-1 flex-col p-5">
         <Link to={`/products/${id}`} onMouseEnter={seedProductDetailCache}>
           <h5 className="mb-1 text-2xl font-medium tracking-tight text-gray-700 dark:text-white">
             {name}
@@ -102,7 +102,10 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             By {author}
           </p>
         )}
-        <p className="mb-3 font-normal text-gray-700 dark:text-gray-400">
+        {/* line-clamp keeps every card the same height regardless of each
+            product's overview length (3 lines matches ProductCardSkeleton's
+            geometry) instead of the grid row growing to the longest overview. */}
+        <p className="mb-3 line-clamp-3 font-normal text-gray-700 dark:text-gray-400">
           {overview}
         </p>
 
@@ -137,7 +140,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
           </div>
         )}
 
-        <p className="flex justify-between items-center">
+        <p className="mt-auto flex justify-between items-center">
           <span className="text-2xl dark:text-gray-200">
             <span>$</span>
             <span>{price}</span>

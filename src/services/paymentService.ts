@@ -43,31 +43,19 @@ export interface PaymentIntentResult {
   status: string;
 }
 
-interface PaymentUser {
-  id?: string;
-  email?: string;
-  name?: string;
-}
-
-export async function createPaymentIntent(amount: number, cartList: CartItem[], user: PaymentUser): Promise<PaymentIntentResult> {
+export async function createPaymentIntent(cartList: CartItem[]): Promise<PaymentIntentResult> {
   const browserData = getSession();
 
   if (!browserData.cbid) {
     throw new ApiError("User not authenticated", 401);
   }
 
-  // Convert amount to cents (Stripe uses cents)
-  const amountInCents = Math.round(amount * 100);
-
+  // Only product id + quantity are sent — the backend looks up live prices
+  // and recomputes the charge total itself (never trusts a client amount),
+  // and derives the user identity from the auth token, not the request body.
   const requestBody = {
-    amount: amountInCents,
     currency: "usd",
-    metadata: {
-      userId: user.id || browserData.cbid,
-      userEmail: user.email,
-      userName: user.name || "Guest",
-      itemCount: cartList.length,
-    },
+    cartList: cartList.map((item) => ({ id: item.id, quantity: item.quantity })),
   };
 
   const response = await fetch(`${API_BASE_URL}/payment/create-intent`, {

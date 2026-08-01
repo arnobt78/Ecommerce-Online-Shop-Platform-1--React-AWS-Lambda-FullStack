@@ -27,6 +27,7 @@ export { FormCheckbox } from "./form-checkbox";
 export { FormError } from "./form-error";
 export { ImageUpload } from "./image-upload";
 export { OrderTrackingInfo } from "./order-tracking-info";
+export { OrderTimeline } from "./order-timeline";
 export { AddressLines } from "./address-lines";
 export { UserAvatar } from "./user-avatar";
 export { ScrollReveal, StaggerContainer, StaggerItem } from "./motion";
@@ -37,4 +38,5 @@ export { BookCover } from "./book-cover";
 export type { BookCoverVariant } from "./book-cover";
 export { ProductVideo } from "./product-video";
 export { ProductReel } from "./product-reel";
+export { Sparkline } from "./sparkline";
 

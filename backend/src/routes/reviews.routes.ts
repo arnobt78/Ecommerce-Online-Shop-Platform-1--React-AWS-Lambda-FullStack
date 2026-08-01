@@ -8,6 +8,7 @@ import * as reviewsService from "../services/reviews.service";
 import { createReviewSchema } from "../services/reviews.service";
 import { getOrderById } from "../services/orders.service";
 import { logActivity } from "../services/activityLog.service";
+import { analyzeReviewSentiment, AiInsightsUnavailableError } from "../services/aiInsights.service";
 
 export const publicRouter = express.Router();
 export const adminRouter = express.Router();
@@ -126,6 +127,26 @@ adminRouter.get("/admin/reviews/:id", requireAuth, requireAdmin, async (req: Req
     return successResponse(res, review);
   } catch (error) {
     console.error("Admin review detail error:", error);
+    return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
+  }
+});
+
+// POST /admin/reviews/:id/analyze-sentiment — REQ-1651: on-demand AI sentiment/
+// moderation-flag check, run per admin click (not automatically on every
+// review) to keep it opt-in and avoid adding LLM latency/cost to review
+// creation. Analyzes the review's real persisted text, not client-supplied text.
+adminRouter.post("/admin/reviews/:id/analyze-sentiment", requireAuth, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const review = await reviewsService.getReviewById(req.params.id!);
+    if (!review) return errorResponse(res, "Review not found", 404);
+
+    const result = await analyzeReviewSentiment(review.rating, review.comment);
+    return successResponse(res, result);
+  } catch (error) {
+    if (error instanceof AiInsightsUnavailableError) {
+      return errorResponse(res, { message: error.message, code: error.code }, 503);
+    }
+    console.error("Review sentiment analysis error:", error);
     return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
   }
 });

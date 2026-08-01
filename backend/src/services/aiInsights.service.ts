@@ -109,3 +109,61 @@ export async function getBusinessInsights(summary: string): Promise<AiInsightsRe
   cache.set(cacheKey, { result: output, expiresAt: Date.now() + CACHE_TTL_MS });
   return output;
 }
+
+// Parent: REQ-1651 — review sentiment / moderation-flag advisor. Unlike
+// restock/pricing/fraud (REQ-1648/1650/1652, deterministic math on order
+// data), sentiment on free-text genuinely needs a language model. Run
+// on-demand per admin click (not automatically on every review submission)
+// to keep this opt-in and avoid adding LLM latency/cost to the checkout-
+// adjacent review-creation path. Reuses the same multi-provider chain.
+const SENTIMENT_SYSTEM_PROMPT =
+  "You are a review-moderation assistant for an e-commerce store. Given a star rating and a review comment, " +
+  "reply with exactly two lines, nothing else: " +
+  "Line 1: one word — positive, neutral, or negative (the comment's actual sentiment). " +
+  "Line 2: one word — flagged or clear (flagged if the comment looks fake/spam/generic/promotional, or if its " +
+  "sentiment clearly contradicts the star rating; clear otherwise), followed by a colon and a short reason " +
+  "(under 15 words) if flagged, or just 'clear' if not.";
+
+export interface ReviewSentimentResult {
+  sentiment: "positive" | "neutral" | "negative";
+  flagged: boolean;
+  reason: string | null;
+  provider: string;
+}
+
+export async function analyzeReviewSentiment(rating: number, comment: string): Promise<ReviewSentimentResult> {
+  if (!isLlmConfigured()) {
+    throw new AiInsightsUnavailableError(
+      "AI review analysis is not configured. Add at least one provider API key to the backend .env.",
+      "LLM_NOT_CONFIGURED"
+    );
+  }
+
+  const result = await createChatCompletion(
+    [
+      { role: "system", content: SENTIMENT_SYSTEM_PROMPT },
+      { role: "user", content: `Rating: ${rating}/5 stars\nComment: "${comment}"` },
+    ],
+    { max_tokens: 256, temperature: 0.2 }
+  );
+
+  if (!result.ok) {
+    if (result.kind === "rate_limit") {
+      throw new AiInsightsUnavailableError("All configured AI providers are rate-limited right now. Try again shortly.", "LLM_RATE_LIMIT");
+    }
+    throw new AiInsightsUnavailableError("AI review analysis is temporarily unavailable — every configured provider failed.", "LLM_UPSTREAM");
+  }
+
+  const lines = result.text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const sentimentLine = (lines[0] || "").toLowerCase();
+  const flagLine = (lines[1] || "").toLowerCase();
+
+  const sentiment: ReviewSentimentResult["sentiment"] = sentimentLine.includes("positive") ? "positive" : sentimentLine.includes("negative") ? "negative" : "neutral";
+  const flagged = flagLine.startsWith("flagged");
+  const reason = flagged ? flagLine.replace(/^flagged:?\s*/, "").trim() || null : null;
+
+  return { sentiment, flagged, reason, provider: result.provider };
+}

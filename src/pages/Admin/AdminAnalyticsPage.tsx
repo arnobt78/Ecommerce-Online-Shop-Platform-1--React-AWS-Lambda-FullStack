@@ -200,7 +200,14 @@ const AdminAnalyticsContent = ({
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <AdminMetricsCard title="Total Revenue" value={summary ? formatPrice(summary.totalRevenue) : "$0.00"} icon={DollarSign} color="emerald" subtitle="All-time sales" />
-            <AdminMetricsCard title="Total Orders" value={summary?.totalOrders || 0} icon={ShoppingCart} color="blue" subtitle="All-time orders" />
+            <AdminMetricsCard
+              title="Total Orders"
+              value={summary?.totalOrders || 0}
+              icon={ShoppingCart}
+              color="blue"
+              subtitle="All-time orders"
+              breakdown={Object.entries(summary?.ordersByStatus || {}).map(([status, count]) => ({ label: status, value: count }))}
+            />
             <AdminMetricsCard title="Total Products" value={summary?.totalProducts || 0} icon={Package} color="violet" subtitle="Catalog size" />
             <AdminMetricsCard title="Total Users" value={summary?.totalUsers || 0} icon={Users} color="amber" subtitle="Registered users" />
           </div>

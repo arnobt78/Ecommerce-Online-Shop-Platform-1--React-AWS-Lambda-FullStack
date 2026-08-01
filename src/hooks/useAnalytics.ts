@@ -119,6 +119,7 @@ const EMPTY_SUMMARY: AnalyticsSummary = {
   totalProducts: 0,
   totalUsers: 0,
   averageOrderValue: 0,
+  ordersByStatus: {},
 };
 
 export function useAnalyticsSummary(enabled = true): AnalyticsResult<AnalyticsSummary> {

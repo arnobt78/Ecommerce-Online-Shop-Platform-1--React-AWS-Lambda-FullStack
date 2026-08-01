@@ -23,6 +23,7 @@ import { useTitle } from "../../hooks/useTitle";
 import { useAllOrders, useUpdateOrderStatus, useAllUsers } from "../../hooks/useAdmin";
 import { AdminLayout, useAdminLayout } from "../../components/Layouts/Admin";
 import { formatPrice } from "../../utils/formatPrice";
+import { calculateOrderRiskFlags } from "../../services/analyticsService";
 import {
   DataTable,
   DropdownMenu,
@@ -45,6 +46,8 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
   AlertDialogAction,
+  FormLabel,
+  FormTextarea,
 } from "../../components/ui";
 import type { Order, OrderStatus, User } from "../../types";
 
@@ -80,6 +83,7 @@ const AdminOrdersContent = () => {
   const { data: users } = useAllUsers(); // Fetch all users to enrich order data
   const updateStatusMutation = useUpdateOrderStatus();
   const [orderPendingCancel, setOrderPendingCancel] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [filterStatus, setFilterStatus] = useState(searchParams.get("status") || "all");
 
@@ -113,6 +117,10 @@ const AdminOrdersContent = () => {
       return order;
     });
   }, [orders, userLookup]);
+
+  // REQ-1650 — deterministic risk flag per order (not an LLM call), derived
+  // from the same already-fetched orders list.
+  const orderRiskFlags = useMemo(() => calculateOrderRiskFlags(enrichedOrders), [enrichedOrders]);
 
   // Sync search params with state
   useEffect(() => {
@@ -172,16 +180,26 @@ const AdminOrdersContent = () => {
   const handleCancelConfirm = async () => {
     if (!orderPendingCancel) return;
     try {
+      // REQ-1639: a paid order is automatically refunded server-side when
+      // cancelled (see orders.routes.ts's isCancellingPaidOrder branch) —
+      // same behavior as AdminOrderDetailPage's cancel action.
       await updateStatusMutation.mutateAsync({
         orderId: orderPendingCancel,
         status: "cancelled",
+        reason: cancelReason.trim() || undefined,
       });
       setOrderPendingCancel(null);
+      setCancelReason("");
     } catch (error) {
       // Error toast is handled by the mutation hook
       console.error("Cancel order error:", error);
     }
   };
+
+  // Order currently pending cancellation, if any — used to tailor the confirm
+  // dialog's copy when the order was already paid (REQ-1639).
+  const orderPendingCancelDetails = useMemo(() => enrichedOrders?.find((o) => o.id === orderPendingCancel) || null, [enrichedOrders, orderPendingCancel]);
+  const orderPendingCancelIsPaid = orderPendingCancelDetails?.paymentStatus === "paid" && orderPendingCancelDetails?.status !== "refunded" && !!orderPendingCancelDetails?.paymentIntentId;
 
   // Table column definitions (@tanstack/react-table, REQ-1611)
   const tableColumns = [
@@ -216,7 +234,23 @@ const AdminOrdersContent = () => {
     columnHelper.accessor((order) => Number(order.amount_paid || 0), {
       id: "amount_paid",
       header: "Amount",
-      cell: (info) => <span className="text-sm font-medium text-gray-700 dark:text-white">${formatPrice(info.getValue())}</span>,
+      cell: (info) => {
+        const risk = orderRiskFlags.get(info.row.original.id);
+        return (
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-white">
+            ${formatPrice(info.getValue())}
+            {/* REQ-1650 — deterministic anomaly flag, review signal only, never an auto-block */}
+            {risk?.isRisky && (
+              <span
+                title={risk.reason || "Unusual order amount"}
+                className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+              >
+                ⚠ Review
+              </span>
+            )}
+          </span>
+        );
+      },
       meta: { cellClassName: "whitespace-nowrap" },
     }),
     columnHelper.accessor((order) => Number(order.quantity || 0), {
@@ -230,12 +264,18 @@ const AdminOrdersContent = () => {
       header: "Status",
       cell: (info) => {
         const order = info.row.original;
+        // "refunded" is a terminal state reached only via the real Stripe
+        // refund flow — shown as a plain badge since it isn't a selectable
+        // manual status and there's no valid next transition from it.
+        if (order.status === "refunded") {
+          return <StatusBadge status="refunded" />;
+        }
         return (
           <StatusBadge
             status={order.status || "pending"}
             asSelect={true}
             onChange={(newStatus) => handleStatusUpdate(order.id, newStatus as OrderStatus)}
-            options={statusOptions.filter((opt) => opt.value !== "all")}
+            options={statusOptions}
             disabled={updateStatusMutation.isPending}
           />
         );
@@ -272,7 +312,8 @@ const AdminOrdersContent = () => {
     }),
   ];
 
-  // Available status options for filter dropdown
+  // Available status options for the filter dropdown — "refunded" is a real,
+  // filterable order state (set by the refund flow), so it stays here.
   const filterStatusOptions = [
     { value: "all", label: "All Status" },
     { value: "pending", label: "Pending" },
@@ -280,11 +321,14 @@ const AdminOrdersContent = () => {
     { value: "shipped", label: "Shipped" },
     { value: "delivered", label: "Delivered" },
     { value: "cancelled", label: "Cancelled" },
-    { value: "refunded", label: "Refunded" }, // Added refunded status option
+    { value: "refunded", label: "Refunded" },
   ];
 
-  // Status options for status badge select (without "all")
-  const statusOptions = filterStatusOptions.filter((opt) => opt.value !== "all");
+  // Status options for the per-row inline status-change select — "refunded"
+  // is excluded here (unlike the filter above): it's not a backend-recognized
+  // manual status, and refunding must always go through the real Stripe flow
+  // (the Refund action on the order detail page, or cancelling a paid order).
+  const statusOptions = filterStatusOptions.filter((opt) => opt.value !== "all" && opt.value !== "refunded");
 
   return (
     <div className="space-y-6 w-full max-w-full">
@@ -331,8 +375,29 @@ const AdminOrdersContent = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel This Order?</AlertDialogTitle>
-            <AlertDialogDescription>This restores stock for every item in the order and emails the customer a cancellation notice. This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This restores stock for every item in the order and emails the customer a cancellation notice.
+              {orderPendingCancelIsPaid && (
+                <>
+                  {" "}
+                  Since this order was already paid, <span className="font-medium">${formatPrice(orderPendingCancelDetails?.amount_paid)}</span> will also be automatically refunded to the
+                  customer's original payment method.
+                </>
+              )}{" "}
+              This action cannot be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="px-6 pb-2">
+            <FormLabel htmlFor="orders-list-cancel-reason">Reason (optional, internal note)</FormLabel>
+            <FormTextarea
+              id="orders-list-cancel-reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="e.g. Customer requested cancellation"
+              rows={2}
+              disabled={updateStatusMutation.isPending}
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={updateStatusMutation.isPending}>Keep Order</AlertDialogCancel>
             <AlertDialogAction onClick={handleCancelConfirm} disabled={updateStatusMutation.isPending} className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600">

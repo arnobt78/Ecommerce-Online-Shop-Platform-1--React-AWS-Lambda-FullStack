@@ -17,9 +17,11 @@ import {
   updateReviewStatus,
   getReviewById,
   replyToReview,
+  analyzeReviewSentiment,
   type RatingStats,
   type CreateReviewInput,
   type UpdateReviewInput,
+  type ReviewSentimentResult,
 } from "../services/reviewService";
 import { toast } from "../lib/toast";
 import type { Review } from "../types";
@@ -196,6 +198,17 @@ export function useReplyToReview(): UseMutationResult<Review, Error, ReplyToRevi
     },
     onError: (error) => {
       toast.error(error.message || "Failed to post reply", { closeButton: true, position: "bottom-right" });
+    },
+  });
+}
+
+// REQ-1651 — no cache/invalidation needed: this doesn't change the review's
+// persisted state, just returns an ephemeral analysis for the admin to read.
+export function useAnalyzeReviewSentiment(): UseMutationResult<ReviewSentimentResult, Error, string> {
+  return useMutation({
+    mutationFn: (reviewId: string) => analyzeReviewSentiment(reviewId),
+    onError: (error) => {
+      toast.error(error.message || "Failed to analyze review", { closeButton: true, position: "bottom-right" });
     },
   });
 }

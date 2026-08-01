@@ -63,7 +63,10 @@ export const AdminMetricsCard = ({ title, value, icon: Icon, color = "blue", sub
   const variant = COLOR_VARIANTS[color] || COLOR_VARIANTS.blue;
 
   return (
-    <div className={`group rounded-2xl border p-5 sm:p-6 backdrop-blur-sm transition-all ${variant.card}`}>
+    // h-full + min-h keeps every card in a grid row the same height regardless
+    // of whether it has a subtitle/breakdown — grid's default row stretch does
+    // the rest, so a 4-up row never looks jagged when only some cards have badges.
+    <div className={`group flex h-full min-h-[140px] flex-col rounded-2xl border p-5 sm:p-6 backdrop-blur-sm transition-all ${variant.card}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{title}</p>
@@ -78,7 +81,7 @@ export const AdminMetricsCard = ({ title, value, icon: Icon, color = "blue", sub
       </div>
 
       {breakdown.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-1.5">
+        <div className="mt-auto flex flex-wrap gap-1.5 pt-4">
           {breakdown.map((item) => (
             <span key={item.label} className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${variant.pill}`}>
               {item.label}: {item.value}

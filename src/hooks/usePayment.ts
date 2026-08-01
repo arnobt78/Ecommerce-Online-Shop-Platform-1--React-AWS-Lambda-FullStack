@@ -9,9 +9,7 @@ import { toast } from "../lib/toast";
 import type { CartItem } from "../types";
 
 interface CreatePaymentIntentVariables {
-  amount: number;
   cartList: CartItem[];
-  user: { id?: string; email?: string; name?: string };
 }
 
 interface UseCreatePaymentIntentOptions {
@@ -23,7 +21,7 @@ export function useCreatePaymentIntent(
   options: UseCreatePaymentIntentOptions = {},
 ): UseMutationResult<PaymentIntentResult, Error, CreatePaymentIntentVariables> {
   return useMutation({
-    mutationFn: ({ amount, cartList, user }: CreatePaymentIntentVariables) => createPaymentIntent(amount, cartList, user),
+    mutationFn: ({ cartList }: CreatePaymentIntentVariables) => createPaymentIntent(cartList),
     retry: false, // Don't retry automatically - prevent hundreds of calls
     onSuccess: (data) => {
       options.onSuccess?.(data);

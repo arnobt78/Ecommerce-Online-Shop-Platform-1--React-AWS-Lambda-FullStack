@@ -7,7 +7,9 @@ import express, { type Request, type Response } from "express";
 import Stripe from "stripe";
 import { successResponse, errorResponse } from "../lib/response";
 import { requireAuth } from "../lib/auth";
+import { paymentLimiter } from "../lib/rateLimit";
 import * as ordersService from "../services/orders.service";
+import { getProductsByIds } from "../services/products.service";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
@@ -15,25 +17,57 @@ const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 const router = express.Router();
 
+interface CartLineItem {
+  id?: unknown;
+  quantity?: unknown;
+}
+
 // POST /payment/create-intent
-router.post("/payment/create-intent", requireAuth, async (req: Request, res: Response) => {
+router.post("/payment/create-intent", paymentLimiter, requireAuth, async (req: Request, res: Response) => {
   try {
     if (!stripe) return errorResponse(res, "Payment service is not configured. Please contact support.", 500);
 
-    const { amount, currency = "usd", metadata = {} } = req.body || {};
-    if (!amount || typeof amount !== "number" || amount < 50) {
-      return errorResponse(res, "Invalid amount. Minimum is $0.50.", 400);
+    const { cartList, currency = "usd" } = req.body || {};
+    if (!Array.isArray(cartList) || cartList.length === 0) {
+      return errorResponse(res, "Cart is empty.", 400);
+    }
+
+    // Security: the charge amount is never trusted from the client — it is
+    // always recomputed here from live DB prices, so a tampered request body
+    // can't create a Stripe charge for less than the real cart total.
+    const ids = (cartList as CartLineItem[])
+      .map((item) => item.id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+    const products = await getProductsByIds(ids);
+    const priceById = new Map(products.map((p) => [p.id, p.price]));
+
+    let amountInCents = 0;
+    for (const item of cartList as CartLineItem[]) {
+      const price = typeof item.id === "string" ? priceById.get(item.id) : undefined;
+      if (price === undefined) {
+        return errorResponse(res, `Product ${typeof item.id === "string" ? item.id : ""} no longer exists.`, 400);
+      }
+      const quantity = typeof item.quantity === "number" && item.quantity > 0 ? Math.floor(item.quantity) : 1;
+      amountInCents += Math.round(price * 100) * quantity;
+    }
+
+    if (amountInCents < 50) {
+      return errorResponse(res, "Invalid order total. Minimum is $0.50.", 400);
     }
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount),
-      currency: currency.toLowerCase(),
+      amount: amountInCents,
+      currency: typeof currency === "string" ? currency.toLowerCase() : "usd",
       automatic_payment_methods: { enabled: true },
       metadata: {
+        // Trusted fields set from the verified JWT last, so nothing in the
+        // request body can spoof another user's identity on this charge —
+        // handlePaymentSuccess() below trusts metadata.userId for the webhook
+        // fallback order-creation path.
         userId: req.user!.id,
         userEmail: req.user!.email,
         userName: req.user!.name || "Guest",
-        ...metadata,
+        itemCount: String(cartList.length),
       },
     });
 

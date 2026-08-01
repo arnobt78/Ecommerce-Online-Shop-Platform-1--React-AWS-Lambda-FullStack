@@ -65,6 +65,13 @@ export async function getProductById(id: string): Promise<Product | null> {
   return prisma.product.findUnique({ where: { id } });
 }
 
+// Parent: REQ-1637 — bulk price lookup for server-side cart total recomputation
+// (payment.routes.ts) so a Stripe charge amount is never trusted from the client.
+export async function getProductsByIds(ids: string[]): Promise<Product[]> {
+  if (ids.length === 0) return [];
+  return prisma.product.findMany({ where: { id: { in: ids } } });
+}
+
 export async function getFeaturedProductsCount(): Promise<number> {
   return prisma.product.count({ where: { featured_product: 1 } });
 }

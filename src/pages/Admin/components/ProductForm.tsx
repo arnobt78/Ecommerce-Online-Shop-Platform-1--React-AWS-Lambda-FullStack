@@ -6,10 +6,12 @@
  * Includes validation for max 3 featured products.
  */
 
-import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
-import { Info } from "lucide-react";
+import { useState, useEffect, useMemo, type ChangeEvent, type FormEvent } from "react";
+import { Info, TrendingUp, TrendingDown } from "lucide-react";
 import { FormInput, FormLabel, FormTextarea, FormCheckbox, FormSelect, FormError, ImageUpload, RippleButton, BookCover } from "../../../components/ui";
 import { useImageUpload } from "../../../hooks/useImageUpload";
+import { useAllOrders } from "../../../hooks/useAdmin";
+import { calculateSuggestedPrice } from "../../../services/analyticsService";
 import type { Product } from "../../../types";
 
 // REQ-1511: catalog categories used to seed data/db.json — kept as a plain
@@ -69,6 +71,16 @@ type FormChangeEvent = ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTML
 
 export const ProductForm = ({ product = null, onSubmit, isLoading = false, featuredProductsCount = 0 }: ProductFormProps) => {
   const isEditMode = !!product;
+
+  // REQ-1652 — deterministic suggested-price nudge (sell-through rate over the
+  // last 30 days), admin-approve-only: shown as a dismissible banner, never
+  // auto-applied to the price field.
+  const { data: allOrdersForPricing = [] } = useAllOrders(isEditMode);
+  const [priceSuggestionDismissed, setPriceSuggestionDismissed] = useState(false);
+  const priceSuggestion = useMemo(() => {
+    if (!product) return null;
+    return calculateSuggestedPrice(product, allOrdersForPricing);
+  }, [product, allOrdersForPricing]);
 
   // Image upload hook
   const imageUploadMutation = useImageUpload({
@@ -440,6 +452,37 @@ export const ProductForm = ({ product = null, onSubmit, isLoading = false, featu
         </FormLabel>
         <FormInput id="price" name="price" type="number" value={formData.price} onChange={handleChange} step="0.01" min="0" placeholder="0.00" required error={errors.price} />
         <FormError message={errors.price} />
+        {/* REQ-1652 — suggestion only, admin must click Apply and still Save to take effect */}
+        {priceSuggestion && !priceSuggestionDismissed && (
+          <div className="mt-2 flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 p-3 text-xs dark:border-violet-800 dark:bg-violet-900/20">
+            {priceSuggestion.direction === "increase" ? (
+              <TrendingUp className="h-4 w-4 flex-shrink-0 text-violet-600 dark:text-violet-400" strokeWidth={2} />
+            ) : (
+              <TrendingDown className="h-4 w-4 flex-shrink-0 text-violet-600 dark:text-violet-400" strokeWidth={2} />
+            )}
+            <div className="flex-1">
+              <p className="text-violet-800 dark:text-violet-300">
+                Suggested price: <span className="font-semibold">${priceSuggestion.suggestedPrice}</span> — {priceSuggestion.reason}
+              </p>
+              <div className="mt-1.5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, price: priceSuggestion.suggestedPrice }))}
+                  className="rounded bg-violet-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
+                >
+                  Apply to field
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPriceSuggestionDismissed(true)}
+                  className="rounded px-2 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 dark:text-violet-300 dark:hover:bg-violet-900/40"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stock Quantity and Low Stock Threshold Fields */}

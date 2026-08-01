@@ -1,5 +1,5 @@
 export { login, register, logout, getDemoAccounts, demoLogin } from "./authService";
-export { getUser, getUserOrders, getOrderDetail, createOrder } from "./dataService";
+export { getUser, getUserOrders, getOrderDetail, createOrder, downloadOrderInvoice } from "./dataService";
 export { getProductList, getProduct } from "./productService";
 export {
   getAllOrders,

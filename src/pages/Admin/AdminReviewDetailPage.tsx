@@ -9,10 +9,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { CheckCircle2, MessageSquare } from "lucide-react";
+import { CheckCircle2, MessageSquare, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "../../lib/toast";
 import { useTitle } from "../../hooks/useTitle";
-import { useReview, useUpdateReviewStatus, useReplyToReview } from "../../hooks/useReviews";
+import { useReview, useUpdateReviewStatus, useReplyToReview, useAnalyzeReviewSentiment } from "../../hooks/useReviews";
 import { useAllProducts } from "../../hooks/useAdmin";
 import { AdminLayout, useAdminLayout } from "../../components/Layouts/Admin";
 import { PageHeader, LoadingState, ErrorState, Card, FormSelect, FormTextarea, FormLabel, RippleButton } from "../../components/ui";
@@ -33,6 +33,7 @@ const AdminReviewDetailContent = () => {
   const { data: allProducts = [] } = useAllProducts();
   const updateStatusMutation = useUpdateReviewStatus();
   const replyMutation = useReplyToReview();
+  const sentimentMutation = useAnalyzeReviewSentiment();
 
   const [replyText, setReplyText] = useState("");
 
@@ -77,6 +78,33 @@ const AdminReviewDetailContent = () => {
                   </span>
                 </div>
                 <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{review.comment}</p>
+
+                {/* REQ-1651 — on-demand AI sentiment/moderation check, not run automatically */}
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => sentimentMutation.mutate(review.id)}
+                    disabled={sentimentMutation.isPending}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-violet-700 dark:text-violet-300 dark:hover:bg-violet-900/20"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+                    {sentimentMutation.isPending ? "Analyzing..." : "Analyze with AI"}
+                  </button>
+                  {sentimentMutation.data && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium capitalize text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                        {sentimentMutation.data.sentiment}
+                      </span>
+                      {sentimentMutation.data.flagged && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                          <AlertTriangle className="h-3 w-3" strokeWidth={2} />
+                          Needs moderation{sentimentMutation.data.reason ? `: ${sentimentMutation.data.reason}` : ""}
+                        </span>
+                      )}
+                      <span className="text-gray-400 dark:text-gray-500">via {sentimentMutation.data.provider}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="w-full sm:w-48">
                 <FormLabel htmlFor="status">Moderation Status</FormLabel>

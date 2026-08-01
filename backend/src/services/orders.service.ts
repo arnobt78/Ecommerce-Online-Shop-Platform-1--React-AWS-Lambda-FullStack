@@ -3,7 +3,7 @@
 // decrement/rollback logic, and status transitions, Prisma instead of DynamoDB.
 
 import { z } from "zod";
-import type { Order } from "@prisma/client";
+import { Prisma, type Order } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { decrementProductStock, incrementProductStock } from "./products.service";
 
@@ -86,6 +86,14 @@ export async function createOrder(orderData: CreateOrderInput): Promise<OrderWit
     throw new Error("User information is required");
   }
 
+  // REQ-1641: idempotency — a double-click or a retried request after a
+  // network blip must never create two orders (and double-decrement stock)
+  // for the same Stripe payment. Checked first, before touching stock at all.
+  if (orderData.paymentIntentId) {
+    const existingOrder = await prisma.order.findUnique({ where: { paymentIntentId: orderData.paymentIntentId } });
+    if (existingOrder) return existingOrder;
+  }
+
   // Decrement stock for each cart item before creating the order (reserves stock).
   // Rolls back any successful decrements if a later item fails or order creation fails,
   // mirroring the AWS Lambda backend's compensating-transaction behavior.
@@ -140,10 +148,24 @@ export async function createOrder(orderData: CreateOrderInput): Promise<OrderWit
       },
     });
   } catch (orderError) {
-    const message = orderError instanceof Error ? orderError.message : String(orderError);
+    // This request's stock decrement is rolled back on any insert failure —
+    // including the race-condition case below, since the *other* concurrent
+    // request's order is the one that legitimately reserved that stock.
     for (const rollback of stockUpdatesToRollback) {
       await incrementProductStock(rollback.productId, rollback.quantity).catch(() => {});
     }
+
+    // REQ-1641: race-condition safety net — two near-simultaneous requests
+    // for the same PaymentIntent could both pass the pre-check above before
+    // either inserts; the DB's unique constraint on paymentIntentId is the
+    // final arbiter. The losing request returns the winner's order instead of
+    // surfacing a duplicate-order error to the client.
+    if (orderError instanceof Prisma.PrismaClientKnownRequestError && orderError.code === "P2002" && orderData.paymentIntentId) {
+      const winningOrder = await prisma.order.findUnique({ where: { paymentIntentId: orderData.paymentIntentId } });
+      if (winningOrder) return winningOrder;
+    }
+
+    const message = orderError instanceof Error ? orderError.message : String(orderError);
     throw new Error(`Failed to create order: ${message}`);
   }
 

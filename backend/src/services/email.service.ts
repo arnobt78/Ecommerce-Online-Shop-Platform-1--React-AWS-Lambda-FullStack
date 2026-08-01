@@ -33,6 +33,9 @@ export interface EmailTemplateData {
   currentStock?: number;
   lowStockThreshold?: number;
   error?: string;
+  // REQ-1654 — daily low-stock/out-of-stock digest (rollup instead of a ping per order)
+  lowStockProducts?: Array<{ id: string; name: string; stock: number; lowStockThreshold: number }>;
+  outOfStockProducts?: Array<{ id: string; name: string }>;
 }
 
 interface EmailContent {
@@ -205,6 +208,29 @@ export const emailTemplates: Record<string, (data: EmailTemplateData) => EmailCo
       bodyHtml: `<p><strong>URGENT:</strong> A product has run out of stock:</p>${infoBox([row("Product", data.productName || ""), row("Product ID", data.productId || ""), row("Status", "OUT OF STOCK")])}<p>Please restock immediately.</p>`,
     }),
   }),
+
+  // REQ-1654 — consolidated rollup instead of a ping per order (existing
+  // admin-low-stock/admin-out-of-stock templates above stay as the real-time
+  // per-order alerts; this is the on-demand digest across the whole catalog).
+  "admin-low-stock-digest": (data) => {
+    const lowStock = data.lowStockProducts || [];
+    const outOfStock = data.outOfStockProducts || [];
+    const total = lowStock.length + outOfStock.length;
+    const lowStockRows = lowStock.map((p) => row(p.name, `${p.stock} left (threshold ${p.lowStockThreshold})`));
+    const outOfStockRows = outOfStock.map((p) => row(p.name, "OUT OF STOCK"));
+    return {
+      subject: `Stock Digest: ${total} product${total === 1 ? "" : "s"} need attention [${generateUniqueId()}]`,
+      text: `Stock digest — ${outOfStock.length} out of stock, ${lowStock.length} low stock. ${[...outOfStock.map((p) => p.name), ...lowStock.map((p) => p.name)].join(", ")}.`,
+      html: wrapEmail({
+        headerColor: "#f59e0b",
+        headerTitle: "📦 Stock Digest",
+        bodyHtml:
+          (outOfStock.length > 0 ? `<p><strong>Out of stock (${outOfStock.length}):</strong></p>${infoBox(outOfStockRows)}` : "") +
+          (lowStock.length > 0 ? `<p><strong>Low stock (${lowStock.length}):</strong></p>${infoBox(lowStockRows)}` : "") +
+          (total === 0 ? "<p>No products currently need restocking.</p>" : "<p>Review the admin catalog to restock.</p>"),
+      }),
+    };
+  },
 
   "admin-payment-failure": (data) => ({
     subject: `Payment Failure Alert - Order #${data.orderId} [${generateUniqueId()}]`,

@@ -118,6 +118,44 @@ export async function getOrderDetail(orderId: string): Promise<OrderWithTimeline
   return response.json();
 }
 
+// REQ-1640: on-demand invoice PDF, shared by both the customer order detail
+// page and the admin order detail page (same endpoint — ownership-checked
+// server-side, so an admin's own token is accepted for any order). Triggers a
+// real browser download instead of returning JSON like every other call here.
+export async function downloadOrderInvoice(orderId: string): Promise<void> {
+  const browserData = getSession();
+
+  if (!browserData.token) {
+    throw new ApiError("User not authenticated", 401);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/orders/${orderId}/invoice`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${browserData.token}` },
+  });
+
+  if (!response.ok) {
+    let errorMessage = response.statusText;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorData.error || response.statusText;
+    } catch {
+      errorMessage = response.statusText;
+    }
+    throw new ApiError(errorMessage, response.status);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `invoice-${orderId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 interface PaymentInfo {
   paymentIntentId?: string;
   paymentStatus?: string;

@@ -22,11 +22,13 @@ import {
   getUserById,
   getActivityLogs,
   getAiInsights,
+  sendLowStockDigest,
   type AdminStats,
   type GenerateLabelOptions,
   type OrderTrackingResult,
   type ActivityLogQueryOptions,
   type AiInsightsResult,
+  type LowStockDigestResult,
 } from "../services/adminService";
 import {
   sendShippingNotificationEmail,
@@ -39,7 +41,7 @@ import {
 } from "../services/emailService";
 import { invalidateAfterProductChange, invalidateAfterOrderStatusUpdate } from "../utils/queryInvalidation";
 import { toast } from "../lib/toast";
-import type { ActivityLog, AdminUserDetail, Order, OrderStatus, Product, User } from "../types";
+import type { ActivityLog, AdminUserDetail, Order, OrderStatus, OrderWithTimeline, Product, User } from "../types";
 
 function isAdminSession(): boolean {
   const hasToken = typeof window !== "undefined" && sessionStorage.getItem("token");
@@ -176,7 +178,7 @@ export function useAllUsers(enabled = true): UseQueryResult<User[], Error> {
   });
 }
 
-export function useOrder(orderId: string | undefined, enabled = true): UseQueryResult<Order, Error> {
+export function useOrder(orderId: string | undefined, enabled = true): UseQueryResult<OrderWithTimeline, Error> {
   return useQuery({
     queryKey: ["admin-order", orderId],
     queryFn: () => getOrderById(orderId as string),
@@ -191,13 +193,14 @@ export function useOrder(orderId: string | undefined, enabled = true): UseQueryR
 interface UpdateOrderStatusVariables {
   orderId: string;
   status: OrderStatus;
+  reason?: string;
 }
 
 export function useUpdateOrderStatus(): UseMutationResult<Order, Error, UpdateOrderStatusVariables> {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ orderId, status }: UpdateOrderStatusVariables) => updateOrderStatus(orderId, status),
+    mutationFn: ({ orderId, status, reason }: UpdateOrderStatusVariables) => updateOrderStatus(orderId, status, reason),
     onSuccess: (data, variables) => {
       // Ensures both admin dashboard and user dashboard update immediately
       invalidateAfterOrderStatusUpdate(queryClient, data.userId || data.user?.id || null, data.id || null);
@@ -464,5 +467,19 @@ export function useAiInsights(summary: string, enabled = true): UseQueryResult<A
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     retry: 1,
+  });
+}
+
+// REQ-1654 — no cache/invalidation needed: sending a digest doesn't change
+// any persisted app state, just an outbound email side effect.
+export function useSendLowStockDigest(): UseMutationResult<LowStockDigestResult, Error, void> {
+  return useMutation({
+    mutationFn: () => sendLowStockDigest(),
+    onSuccess: (data) => {
+      toast.success(`Stock digest sent (${data.outOfStockCount} out of stock, ${data.lowStockCount} low stock)`, { closeButton: true, position: "bottom-right" });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to send stock digest", { closeButton: true, position: "bottom-right" });
+    },
   });
 }

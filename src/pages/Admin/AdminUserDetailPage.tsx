@@ -6,9 +6,9 @@
  * Uses React Query for efficient data fetching and caching.
  */
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { MapPin, Package, Star, Home } from "lucide-react";
+import { MapPin, Package, Star, Home, TrendingUp, Calendar, RefreshCcw } from "lucide-react";
 import { toast } from "../../lib/toast";
 import { useTitle } from "../../hooks/useTitle";
 import { useUser } from "../../hooks/useAdmin";
@@ -17,6 +17,7 @@ import { PageHeader, StatusBadge, LoadingState, ErrorState, Card, AddressLines }
 import { formatDateLong } from "../../utils/formatDate";
 import { formatPrice } from "../../utils/formatPrice";
 import { isDemoAccount } from "../../utils/demoAccount";
+import { calculateCustomerInsights } from "../../services/analyticsService";
 
 // Inner component that uses the AdminLayout context
 const AdminUserDetailContent = () => {
@@ -38,7 +39,10 @@ const AdminUserDetailContent = () => {
   // shipped won't have `orders`/`addresses` on it yet (see REQ-1616's
   // product.tags bug for the same class of issue).
   const addresses = user?.addresses || [];
-  const orders = user?.orders || [];
+  const orders = useMemo(() => user?.orders || [], [user]);
+
+  // REQ-1645 — derived entirely from this customer's own already-fetched orders.
+  const insights = useMemo(() => calculateCustomerInsights(orders), [orders]);
 
   return (
     <div className="space-y-6 w-full max-w-full">
@@ -101,6 +105,82 @@ const AdminUserDetailContent = () => {
               </div>
             </div>
           </Card>
+
+          {/* Customer Insights — REQ-1645: lifetime value, order status breakdown,
+              last-order date, refund/cancellation history, all derived from the
+              orders array already fetched above (no new endpoint). */}
+          {orders.length > 0 && (
+            <Card>
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
+                <h2 className="text-lg font-medium text-gray-700 dark:text-white">Customer Insights</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                  <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Lifetime Value (net)</div>
+                  <div className="text-2xl font-medium text-emerald-900 dark:text-emerald-100 mt-1">${formatPrice(insights.lifetimeValueNet)}</div>
+                  {insights.lifetimeValueGross !== insights.lifetimeValueNet && (
+                    <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-0.5">${formatPrice(insights.lifetimeValueGross)} gross before refunds</div>
+                  )}
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="text-sm font-medium text-sky-600 dark:text-sky-400">Total Orders</div>
+                  <div className="text-2xl font-medium text-sky-900 dark:text-sky-100 mt-1">{insights.orderCount}</div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {Object.entries(insights.ordersByStatus).map(([status, count]) => (
+                      <span key={status} className="inline-flex items-center rounded-full bg-sky-100/80 px-2 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/50 dark:text-sky-200">
+                        {status}: {count}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" strokeWidth={2} />
+                    Last Order
+                  </div>
+                  <div className="text-sm font-medium text-gray-800 dark:text-gray-100 mt-1">{insights.lastOrderDate ? formatDateLong(insights.lastOrderDate) : "—"}</div>
+                </div>
+                <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-lg border border-rose-200 dark:border-rose-800">
+                  <div className="text-sm font-medium text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                    <RefreshCcw className="h-3.5 w-3.5" strokeWidth={2} />
+                    Refunds / Cancellations
+                  </div>
+                  <div className="text-2xl font-medium text-rose-900 dark:text-rose-100 mt-1">
+                    {insights.refundedCount} / {insights.cancelledCount}
+                  </div>
+                </div>
+                {/* REQ-1653 — deterministic churn heuristic (days-since-last-order vs.
+                    this customer's own average reorder interval), not an LLM guess */}
+                <div className="bg-violet-50 dark:bg-violet-900/20 p-4 rounded-lg border border-violet-200 dark:border-violet-800">
+                  <div className="text-sm font-medium text-violet-600 dark:text-violet-400 flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5" strokeWidth={2} />
+                    Churn Risk
+                  </div>
+                  {insights.churnRisk ? (
+                    <>
+                      <span
+                        className={`mt-1 inline-flex items-center rounded-full px-2.5 py-1 text-sm font-semibold capitalize ${
+                          insights.churnRisk === "high"
+                            ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300"
+                            : insights.churnRisk === "medium"
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        }`}
+                      >
+                        {insights.churnRisk}
+                      </span>
+                      <div className="text-xs text-violet-600/80 dark:text-violet-400/80 mt-1">
+                        {insights.daysSinceLastOrder}d since last · ~{insights.averageOrderIntervalDays}d typical
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">Not enough order history</div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )}
 
           {/* Address Book — REQ-1618: read-only view of this customer's saved addresses */}
           <Card>

@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Download } from "lucide-react";
 import { toast } from "../../lib/toast";
 import { useTitle } from "../../hooks/useTitle";
 import { useOrder, useUpdateOrderStatus, useAllUsers, useRefundOrder, useGenerateShippingLabel, useAddTrackingNumber } from "../../hooks/useAdmin";
@@ -22,6 +23,7 @@ import { AdminLayout, useAdminLayout } from "../../components/Layouts/Admin";
 import { getProductImageUrl, getProductImageKey } from "../../utils/productImage";
 import { formatPrice } from "../../utils/formatPrice";
 import { formatDateLong } from "../../utils/formatDate";
+import { downloadOrderInvoice } from "../../services";
 import {
   PageHeader,
   StatusBadge,
@@ -40,9 +42,12 @@ import {
   FormInput,
   FormSelect,
   FormLabel,
+  FormTextarea,
   AddressLines,
+  RippleButton,
+  OrderTimeline,
 } from "../../components/ui";
-import type { Order, OrderStatus, User } from "../../types";
+import type { OrderStatus, OrderWithTimeline, User } from "../../types";
 
 // Inner component that uses the AdminLayout context
 const AdminOrderDetailContent = () => {
@@ -57,6 +62,9 @@ const AdminOrderDetailContent = () => {
   const addTrackingMutation = useAddTrackingNumber();
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
   const [manualTrackingNumber, setManualTrackingNumber] = useState("");
   const [manualTrackingCarrier, setManualTrackingCarrier] = useState("usps");
 
@@ -71,7 +79,7 @@ const AdminOrderDetailContent = () => {
   }, [users]);
 
   // Enrich order with user data from users table (if order is missing name)
-  const enrichedOrder = useMemo<Order | null>(() => {
+  const enrichedOrder = useMemo<OrderWithTimeline | null>(() => {
     if (!order) return null;
 
     // If order doesn't have user name but we have user data in lookup, enrich it
@@ -121,24 +129,47 @@ const AdminOrderDetailContent = () => {
 
   const handleCancelConfirm = useCallback(async () => {
     try {
-      await updateStatusMutation.mutateAsync({ orderId: orderId as string, status: "cancelled" });
+      // REQ-1639: if the order was already paid, the backend automatically
+      // refunds it via the same Stripe flow as the explicit Refund action
+      // (see orders.routes.ts's isCancellingPaidOrder branch) instead of
+      // leaving a "cancelled" order that silently kept the customer's money.
+      await updateStatusMutation.mutateAsync({ orderId: orderId as string, status: "cancelled", reason: cancelReason.trim() || undefined });
       setCancelDialogOpen(false);
+      setCancelReason("");
     } catch (error) {
       // Error toast is handled by the mutation hook
       console.error("Cancel order error:", error);
     }
-  }, [orderId, updateStatusMutation]);
+  }, [orderId, cancelReason, updateStatusMutation]);
 
   // Handle refund (memoized to prevent unnecessary re-renders)
   const handleRefund = useCallback(async () => {
     try {
-      await refundMutation.mutateAsync({ orderId: orderId as string, refundData: {} }); // Full refund by default
+      await refundMutation.mutateAsync({ orderId: orderId as string, refundData: { reason: refundReason.trim() || undefined } }); // Full refund by default
       setRefundDialogOpen(false);
+      setRefundReason("");
     } catch (error) {
       // Error toast is handled by the mutation hook
       console.error("Refund error:", error);
     }
-  }, [orderId, refundMutation]);
+  }, [orderId, refundReason, refundMutation]);
+
+  // REQ-1640: reuses the same PDF the order-confirmation email already
+  // attaches — no separate invoice-storage system, generated on demand.
+  const handleDownloadInvoice = useCallback(async () => {
+    if (!orderId) return;
+    setIsDownloadingInvoice(true);
+    try {
+      await downloadOrderInvoice(orderId);
+    } catch (downloadError) {
+      toast.error(downloadError instanceof Error ? downloadError.message : "Failed to download invoice", {
+        closeButton: true,
+        position: "bottom-right",
+      });
+    } finally {
+      setIsDownloadingInvoice(false);
+    }
+  }, [orderId]);
 
   // Handle generate shipping label (memoized to prevent unnecessary re-renders)
   const handleGenerateLabel = useCallback(async () => {
@@ -183,20 +214,40 @@ const AdminOrderDetailContent = () => {
     return enrichedOrder.paymentStatus === "paid" && enrichedOrder.status !== "refunded" && !!enrichedOrder.paymentIntentId;
   }, [enrichedOrder]);
 
-  // Available status options
+  // Available status options. "Refunded" is intentionally not selectable here
+  // — it's not a backend-recognized manual status (VALID_ORDER_STATUSES) and
+  // refunding always goes through either the dedicated Refund Management
+  // action below or cancelling a paid order (both hit the real Stripe flow).
   const statusOptions = [
     { value: "pending", label: "Pending" },
     { value: "processing", label: "Processing" },
     { value: "shipped", label: "Shipped" },
     { value: "delivered", label: "Delivered" },
     { value: "cancelled", label: "Cancelled" },
-    { value: "refunded", label: "Refunded" }, // Added refunded status option
   ];
 
   return (
     <div className="space-y-6 w-full max-w-full">
       {/* Page Header */}
-      <PageHeader title="Order Details" description="View and manage order information" onToggleSidebar={toggleSidebar} showBackButton={true} onBack={() => navigate("/admin/orders")} />
+      <PageHeader
+        title="Order Details"
+        description="View and manage order information"
+        onToggleSidebar={toggleSidebar}
+        showBackButton={true}
+        onBack={() => navigate("/admin/orders")}
+        actions={
+          enrichedOrder && (
+            <RippleButton
+              onClick={handleDownloadInvoice}
+              disabled={isDownloadingInvoice}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download className="h-4 w-4" strokeWidth={2} />
+              {isDownloadingInvoice ? "Downloading..." : "Download Invoice"}
+            </RippleButton>
+          )
+        }
+      />
 
       {/* Loading State */}
       {isLoading && <LoadingState message="Loading order details..." />}
@@ -225,14 +276,22 @@ const AdminOrderDetailContent = () => {
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
                     <dd className="mt-1">
-                      <StatusBadge
-                        status={enrichedOrder.status || "pending"}
-                        asSelect={true}
-                        onChange={(value) => handleStatusUpdate(value as OrderStatus)}
-                        options={statusOptions}
-                        disabled={updateStatusMutation.isPending}
-                        className="px-3 py-1.5"
-                      />
+                      {/* "refunded" is a terminal state reached only via the real Stripe
+                          refund flow (Refund action or cancelling a paid order) — shown as a
+                          plain badge, not the editable select, since it isn't one of
+                          statusOptions and there's no valid manual next transition from it. */}
+                      {enrichedOrder.status === "refunded" ? (
+                        <StatusBadge status="refunded" className="px-3 py-1.5" />
+                      ) : (
+                        <StatusBadge
+                          status={enrichedOrder.status || "pending"}
+                          asSelect={true}
+                          onChange={(value) => handleStatusUpdate(value as OrderStatus)}
+                          options={statusOptions}
+                          disabled={updateStatusMutation.isPending}
+                          className="px-3 py-1.5"
+                        />
+                      )}
                     </dd>
                   </div>
                 </dl>
@@ -348,6 +407,10 @@ const AdminOrderDetailContent = () => {
               )}
             </dl>
           </Card>
+
+          {/* Status/refund/tracking timeline (REQ-1646) — shared with the customer
+              order detail page, previously admins had no timeline visibility at all */}
+          {enrichedOrder.timeline && <OrderTimeline createdAt={enrichedOrder.createdAt} timeline={enrichedOrder.timeline} />}
 
           {/* Shipping & Tracking Card */}
           <Card className="p-4 sm:p-6">
@@ -483,6 +546,17 @@ const AdminOrderDetailContent = () => {
                       the customer's original payment method. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
+                  <div className="px-6 pb-2">
+                    <FormLabel htmlFor="refund-reason">Reason (optional, internal note)</FormLabel>
+                    <FormTextarea
+                      id="refund-reason"
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      placeholder="e.g. Customer requested cancellation due to shipping delay"
+                      rows={2}
+                      disabled={refundMutation.isPending}
+                    />
+                  </div>
                   <AlertDialogFooter>
                     <AlertDialogCancel disabled={refundMutation.isPending}>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleRefund} disabled={refundMutation.isPending} className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600">
@@ -500,9 +574,28 @@ const AdminOrderDetailContent = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle>Cancel This Order?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This restores stock for every item in the order and emails the customer a cancellation notice. This action cannot be undone.
+                  This restores stock for every item in the order and emails the customer a cancellation notice.
+                  {canRefund && (
+                    <>
+                      {" "}
+                      Since this order was already paid, <span className="font-medium">${formatPrice(enrichedOrder.amount_paid)}</span> will also be automatically refunded to the customer's
+                      original payment method.
+                    </>
+                  )}{" "}
+                  This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <div className="px-6 pb-2">
+                <FormLabel htmlFor="cancel-reason">Reason (optional, internal note)</FormLabel>
+                <FormTextarea
+                  id="cancel-reason"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g. Customer requested cancellation"
+                  rows={2}
+                  disabled={updateStatusMutation.isPending}
+                />
+              </div>
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={updateStatusMutation.isPending}>Keep Order</AlertDialogCancel>
                 <AlertDialogAction onClick={handleCancelConfirm} disabled={updateStatusMutation.isPending} className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600">

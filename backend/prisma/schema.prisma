@@ -113,7 +113,11 @@ model Order {
   amount_paid     Float
   quantity        Int
   status          String    @default("pending") // pending | processing | shipped | delivered | cancelled | refunded
-  paymentIntentId String?
+  // REQ-1641: unique (nullable — Postgres allows multiple NULLs) so a
+  // double-click or retried request after a network blip can never create
+  // two DB orders for one Stripe payment; enforced at the DB level since an
+  // app-level "check then insert" can't fully close the race on its own.
+  paymentIntentId String? @unique
   paymentStatus   String?
   trackingNumber  String?
   trackingCarrier String?

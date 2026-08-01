@@ -25,7 +25,7 @@ import { useAllOrders } from "../../hooks/useAdmin";
 import { useReviewsByProduct } from "../../hooks/useReviews";
 import { AdminLayout, useAdminLayout } from "../../components/Layouts/Admin";
 import { ProductQRCode } from "../../components/ProductQRCode";
-import { PageHeader, StatusBadge, LoadingState, ErrorState, Card, BookCover, ProductVideo } from "../../components/ui";
+import { PageHeader, StatusBadge, LoadingState, ErrorState, Card, BookCover, ProductVideo, Sparkline } from "../../components/ui";
 import { formatPrice } from "../../utils/formatPrice";
 import { getProductImageUrl, getProductImageKey } from "../../utils/productImage";
 import { calculateSingleProductAnalytics, type SingleProductAnalytics } from "../../services/analyticsService";
@@ -63,6 +63,10 @@ const AdminProductDetailContent = () => {
         totalRevenue: 0,
         averageOrderValue: 0,
         orders: [],
+        salesTrend: [],
+        refundedCount: 0,
+        cancelledCount: 0,
+        refundCancelRate: 0,
       };
     }
     return calculateSingleProductAnalytics(productId || null, orders, product);
@@ -219,8 +223,17 @@ const AdminProductDetailContent = () => {
 
           {/* Analytics Card */}
           <Card className="p-4 sm:p-6">
-            <h2 className="text-lg font-medium text-gray-700 dark:text-white mb-4">Sales Analytics</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium text-gray-700 dark:text-white">Sales Analytics</h2>
+              {/* REQ-1644 — monthly units-sold trend, derived from the same orders list above */}
+              {productAnalytics.salesTrend.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Units/mo</span>
+                  <Sparkline data={productAnalytics.salesTrend.map((point) => ({ label: point.month, value: point.quantity }))} />
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="text-sm font-medium text-sky-600 dark:text-sky-400">Times Purchased</div>
                 <div className="text-2xl font-medium text-sky-900 dark:text-sky-100 mt-1">{productAnalytics.purchaseCount}</div>
@@ -236,6 +249,14 @@ const AdminProductDetailContent = () => {
               <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
                 <div className="text-sm font-medium text-purple-600 dark:text-purple-400">Avg Order Value</div>
                 <div className="text-2xl font-medium text-purple-900 dark:text-purple-100 mt-1">${productAnalytics.averageOrderValue.toFixed(2)}</div>
+              </div>
+              {/* REQ-1644 — refund/cancellation rate for this product specifically */}
+              <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-lg border border-rose-200 dark:border-rose-800">
+                <div className="text-sm font-medium text-rose-600 dark:text-rose-400">Refund/Cancel Rate</div>
+                <div className="text-2xl font-medium text-rose-900 dark:text-rose-100 mt-1">{productAnalytics.refundCancelRate}%</div>
+                <div className="text-xs text-rose-600/80 dark:text-rose-400/80 mt-0.5">
+                  {productAnalytics.refundedCount} refunded · {productAnalytics.cancelledCount} cancelled
+                </div>
               </div>
             </div>
           </Card>

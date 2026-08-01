@@ -155,6 +155,7 @@ const AdminDashboardContent = () => {
                     outOfStockProducts: 0,
                   }
                 }
+                restockForecast={stats.restockForecast || []}
                 totalProducts={metrics.totalProducts}
               />
             </ScrollReveal>

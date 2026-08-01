@@ -30,6 +30,9 @@ eBook storefront + admin: catalog, cart, Stripe, addresses, orders, reviews, tic
 - Don’t `npm audit fix` react-router (pin `^7.18.2`)
 - Bump `package.json` version on Query response shape changes (`__APP_VERSION__` cache buster)
 - Keep both `.env.example` files synced with real env reads
+- Schema changes: this project uses `prisma db push`, not `prisma migrate` (no migrations folder) — never offer `migrate dev`'s DB reset
+- Book-cover art (`Product.coverColor`): never assign white/near-white (luminance check, threshold ~230/255) — hides `BookCoverSvg`'s white spine-curl lines
+- `ProductReel` auto-scrolls via `requestAnimationFrame` + direct `transform`, not `scrollBy`/interval — keep it that way for smooth continuous motion, not discrete jumps
 
 ## Status (2026-08-01)
-C1 Phases 1–6 done (REQ-1200…1633). HEAD after this session’s docs/SEO/lint/env sync. Coolify/VPS deferred. Live demo still legacy AWS (`codebook-aws.vercel.app`). Gate 2 / Red Team optional. Lint+tsc clean FE+BE.
+C1 Phases 1–6 done (REQ-1200…1635). Catalog enriched with book-cover art/trailer video/recommendations reel + admin catalog insights (REQ-1634–1635), reference: user's separate `university-library` project — 32 seeded products (17 merged in with downloaded local cover images). Coolify/VPS deferred. Live demo still legacy AWS (`codebook-aws.vercel.app`). Gate 2 / Red Team optional. Lint+tsc clean FE+BE.

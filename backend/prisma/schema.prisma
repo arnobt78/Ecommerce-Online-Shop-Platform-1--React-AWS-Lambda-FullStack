@@ -89,6 +89,13 @@ model Product {
   edition           String?
   fileFormat        String? // "PDF" | "EPUB" | "PDF + EPUB"
   tags              String[] @default([]) // genres/topics — used for related-products lookups
+  // Cover art / trailer pass — enriches the flat product image with a stylized
+  // "3D book" cover (spine + color, see src/components/ui/book-cover.tsx) and an
+  // optional trailer video shown on the product detail page. Both nullable and
+  // additive: products without them keep rendering the plain flat image exactly
+  // as before, so this is a pure enrichment, not a breaking schema change.
+  coverColor        String? // hex color for the BookCover spine/background, e.g. "#1e2a4b"
+  videoUrl          String? // optional book-trailer video URL, rendered by ProductVideo
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

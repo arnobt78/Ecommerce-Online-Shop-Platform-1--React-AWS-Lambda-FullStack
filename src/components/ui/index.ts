@@ -33,4 +33,8 @@ export { ScrollReveal, StaggerContainer, StaggerItem } from "./motion";
 export { ChartSkeleton } from "./chart-skeleton";
 export { RippleButton } from "./ripple-button";
 export { AuthSplitLayout } from "./auth-split-layout";
+export { BookCover } from "./book-cover";
+export type { BookCoverVariant } from "./book-cover";
+export { ProductVideo } from "./product-video";
+export { ProductReel } from "./product-reel";
 

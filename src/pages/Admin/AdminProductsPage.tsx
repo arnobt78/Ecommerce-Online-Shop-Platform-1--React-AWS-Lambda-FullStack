@@ -46,6 +46,7 @@ import {
   EmptyState,
   Card,
   ResultsCount,
+  BookCover,
 } from "../../components/ui";
 import type { Product } from "../../types";
 
@@ -135,19 +136,30 @@ const AdminProductsContent = () => {
         const product = info.row.original;
         return (
           <div className="flex items-center gap-3">
-            {getProductImageUrl(product) && (
-              <div className="flex-shrink-0">
-                <img
-                  key={getProductImageKey(product)}
-                  src={getProductImageUrl(product) || undefined}
+            {product.coverColor ? (
+              <div className="flex-shrink-0 aspect-[143/199] h-16">
+                <BookCover
+                  variant="fill"
+                  coverColor={product.coverColor}
+                  coverImage={getProductImageUrl(product)}
                   alt={product.name || "Product"}
-                  className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
                 />
               </div>
+            ) : (
+              getProductImageUrl(product) && (
+                <div className="flex-shrink-0">
+                  <img
+                    key={getProductImageKey(product)}
+                    src={getProductImageUrl(product) || undefined}
+                    alt={product.name || "Product"}
+                    className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              )
             )}
             <div className="flex-1 min-w-0">
               <Link to={`/admin/products/${product.id}`} className="text-sm font-medium text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 hover:underline">

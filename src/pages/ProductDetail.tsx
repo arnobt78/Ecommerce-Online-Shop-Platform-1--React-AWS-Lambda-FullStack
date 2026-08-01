@@ -11,8 +11,9 @@ import {
   ReviewListSkeleton,
 } from "../components";
 import { ProductQRCode } from "../components/ProductQRCode";
+import { BookCover, ProductVideo, ProductReel } from "../components/ui";
 import { useCart } from "../context";
-import { useProduct } from "../hooks/useProducts";
+import { useProduct, useRecommendedProducts } from "../hooks/useProducts";
 import { useUserOrders } from "../hooks/useUser";
 import {
   useReviewsByProduct,
@@ -66,6 +67,9 @@ export const ProductDetail = () => {
 
   // Fetch user orders to check if they can review
   const { data: userOrders = [] } = useUserOrders();
+
+  // "You Might Also Like" — derived from the already-cached product list, no extra fetch.
+  const { data: recommendedProducts } = useRecommendedProducts(product.id ? product : undefined);
 
   // Mutations
   const createReviewMutation = useCreateReview();
@@ -229,14 +233,30 @@ export const ProductDetail = () => {
           <div className="flex flex-col lg:flex-row lg:items-stretch gap-4 lg:gap-8">
             {/* Left Section - Product Image */}
             <div className="flex-shrink-0 w-full lg:w-auto lg:max-w-xl">
-              <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 h-full">
-                <img
-                  className="w-full h-full rounded-lg object-cover"
-                  src={getProductImageUrl(product) || product.poster || undefined}
-                  key={getProductImageKey(product)}
-                  alt={product.name}
-                />
+              <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 h-full flex items-center justify-center">
+                {product.coverColor ? (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-gray-100 to-gray-200 py-8 dark:from-slate-800 dark:to-slate-950">
+                    <div className="aspect-[143/199] h-full max-h-[30rem] drop-shadow-[0_24px_28px_rgba(0,0,0,0.3)]">
+                      <BookCover
+                        variant="fill"
+                        coverColor={product.coverColor}
+                        coverImage={getProductImageUrl(product) || product.poster}
+                        alt={product.name}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    className="w-full h-full rounded-lg object-cover"
+                    src={getProductImageUrl(product) || product.poster || undefined}
+                    key={getProductImageKey(product)}
+                    alt={product.name}
+                  />
+                )}
               </div>
+
+              {/* Book trailer — only rendered when the product has a videoUrl */}
+              <ProductVideo videoUrl={product.videoUrl} className="mt-4" />
             </div>
 
             {/* Right Section - Product Details Card */}
@@ -487,6 +507,16 @@ export const ProductDetail = () => {
             </div>
           </div>
         </div>
+
+        {/* Recommendations — auto-scrolling reel, pauses on hover, manual chevrons */}
+        {recommendedProducts && recommendedProducts.length > 0 && (
+          <div className="mt-8">
+            <h2 className="mb-4 text-xl sm:text-2xl font-medium text-gray-700 dark:text-slate-200">
+              You Might Also Like
+            </h2>
+            <ProductReel products={recommendedProducts} />
+          </div>
+        )}
 
         {/* Reviews Section */}
         <div className="mt-8">

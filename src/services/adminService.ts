@@ -327,6 +327,27 @@ export async function getUserById(userId: string): Promise<AdminUserDetail> {
   return response.json();
 }
 
+export interface CategoryStat {
+  category: string;
+  count: number;
+  avgRating: number;
+}
+
+export interface TopRatedProduct {
+  id: string;
+  name: string;
+  author: string | null;
+  rating: number;
+}
+
+export interface CatalogHealth {
+  productsWithIsbn: number;
+  productsWithPublisher: number;
+  averagePages: number;
+  inStockProducts: number;
+  outOfStockProducts: number;
+}
+
 export interface AdminStats {
   totalOrders: number;
   totalRevenue: number;
@@ -335,6 +356,14 @@ export interface AdminStats {
   recentOrders: Order[];
   allOrders: Order[];
   ordersByStatus: Record<string, number>;
+  // Catalog insights (REQ: university-library-style admin dashboard enrichment) —
+  // all derived client-side from the products already fetched above, so no
+  // extra network round trip and always in sync with product CRUD invalidation.
+  categoryStats: CategoryStat[];
+  productsByYear: Array<[string, number]>;
+  productsByLanguage: Array<[string, number]>;
+  topRatedProducts: TopRatedProduct[];
+  catalogHealth: CatalogHealth;
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
@@ -367,6 +396,58 @@ export async function getAdminStats(): Promise<AdminStats> {
       return acc;
     }, {});
 
+    // Category breakdown — count + average rating per catalog category.
+    const categoryMap = new Map<string, { count: number; ratingSum: number; ratingCount: number }>();
+    for (const product of products) {
+      const category = product.category || "Uncategorized";
+      const entry = categoryMap.get(category) || { count: 0, ratingSum: 0, ratingCount: 0 };
+      entry.count += 1;
+      if (typeof product.rating === "number") {
+        entry.ratingSum += product.rating;
+        entry.ratingCount += 1;
+      }
+      categoryMap.set(category, entry);
+    }
+    const categoryStats: CategoryStat[] = Array.from(categoryMap.entries())
+      .map(([category, entry]) => ({
+        category,
+        count: entry.count,
+        avgRating: entry.ratingCount > 0 ? entry.ratingSum / entry.ratingCount : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Publication year distribution — most recent years first.
+    const yearMap = new Map<string, number>();
+    for (const product of products) {
+      if (!product.publishedYear) continue;
+      const year = String(product.publishedYear);
+      yearMap.set(year, (yearMap.get(year) || 0) + 1);
+    }
+    const productsByYear: Array<[string, number]> = Array.from(yearMap.entries()).sort((a, b) => Number(b[0]) - Number(a[0]));
+
+    // Language distribution.
+    const languageMap = new Map<string, number>();
+    for (const product of products) {
+      const language = product.language || "Unspecified";
+      languageMap.set(language, (languageMap.get(language) || 0) + 1);
+    }
+    const productsByLanguage: Array<[string, number]> = Array.from(languageMap.entries()).sort((a, b) => b[1] - a[1]);
+
+    // Top rated products (highest rating first, capped at 5).
+    const topRatedProducts: TopRatedProduct[] = [...products]
+      .filter((product) => typeof product.rating === "number")
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .slice(0, 5)
+      .map((product) => ({ id: product.id, name: product.name, author: product.author || null, rating: product.rating || 0 }));
+
+    // Catalog completeness/health metrics.
+    const productsWithIsbn = products.filter((product) => !!product.isbn).length;
+    const productsWithPublisher = products.filter((product) => !!product.publisher).length;
+    const pagesValues = products.map((product) => product.pages).filter((pages): pages is number => typeof pages === "number");
+    const averagePages = pagesValues.length > 0 ? pagesValues.reduce((sum, pages) => sum + pages, 0) / pagesValues.length : 0;
+    const inStockProducts = products.filter((product) => product.in_stock).length;
+    const outOfStockProducts = totalProducts - inStockProducts;
+
     return {
       totalOrders,
       totalRevenue,
@@ -375,6 +456,17 @@ export async function getAdminStats(): Promise<AdminStats> {
       recentOrders,
       allOrders,
       ordersByStatus,
+      categoryStats,
+      productsByYear,
+      productsByLanguage,
+      topRatedProducts,
+      catalogHealth: {
+        productsWithIsbn,
+        productsWithPublisher,
+        averagePages,
+        inStockProducts,
+        outOfStockProducts,
+      },
     };
   } catch (error) {
     // Re-throw ApiError as-is, wrap others

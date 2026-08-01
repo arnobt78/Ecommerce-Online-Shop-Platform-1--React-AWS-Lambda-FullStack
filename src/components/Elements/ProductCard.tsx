@@ -6,6 +6,7 @@ import { User, XCircle, AlertTriangle, CheckCircle2, Plus, Trash2 } from "lucide
 import { useCart } from "../../context";
 import { Rating } from "./Rating";
 import { RippleButton } from "../ui/ripple-button";
+import { BookCover } from "../ui/book-cover";
 import {
   getProductImageUrl,
   getProductImageKey,
@@ -49,27 +50,44 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             Best Seller
           </span>
         )}
-        {productImageUrl && (
-          <img
-            key={getProductImageKey(product)}
-            className="rounded-t-lg w-full h-64 object-cover"
-            src={productImageUrl}
-            alt={name}
-            loading="lazy"
-            onError={(e) => {
-              // Fallback: try poster if image_local fails, or hide if both fail
-              const target = e.target as HTMLImageElement;
-              if (
-                product.image_local &&
-                target.src !== product.poster &&
-                product.poster
-              ) {
-                target.src = product.poster;
-              } else {
-                target.style.display = "none";
-              }
-            }}
-          />
+        {product.coverColor ? (
+          // Book-cover style enrichment (REQ: university-library parity) — falls
+          // back to the flat image below for products without a coverColor.
+          // Subtle "shelf" gradient + drop shadow under the book, with a gentle
+          // lift on hover so the card feels tactile rather than a flat sticker.
+          <div className="group/cover flex h-64 w-full items-center justify-center overflow-hidden rounded-t-lg bg-gradient-to-b from-gray-100 to-gray-200 py-5 dark:from-gray-800 dark:to-gray-950">
+            <div className="aspect-[143/199] h-full drop-shadow-[0_18px_20px_rgba(0,0,0,0.25)] transition-transform duration-300 ease-out group-hover/cover:-translate-y-1 group-hover/cover:scale-[1.03]">
+              <BookCover
+                variant="fill"
+                coverColor={product.coverColor}
+                coverImage={productImageUrl}
+                alt={name}
+              />
+            </div>
+          </div>
+        ) : (
+          productImageUrl && (
+            <img
+              key={getProductImageKey(product)}
+              className="rounded-t-lg w-full h-64 object-cover"
+              src={productImageUrl}
+              alt={name}
+              loading="lazy"
+              onError={(e) => {
+                // Fallback: try poster if image_local fails, or hide if both fail
+                const target = e.target as HTMLImageElement;
+                if (
+                  product.image_local &&
+                  target.src !== product.poster &&
+                  product.poster
+                ) {
+                  target.src = product.poster;
+                } else {
+                  target.style.display = "none";
+                }
+              }}
+            />
+          )
         )}
       </Link>
       <div className="p-5">

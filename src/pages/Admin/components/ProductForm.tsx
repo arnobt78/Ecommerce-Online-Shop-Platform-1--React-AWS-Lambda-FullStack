@@ -51,6 +51,9 @@ interface ProductFormData {
   edition: string;
   fileFormat: string;
   tags: string; // comma-separated in the form, split into string[] on submit
+  // Cover art / trailer pass — optional enrichment, both nullable.
+  coverColor: string; // hex, e.g. "#1e2a4b" — powers the BookCover 3D-cover display
+  videoUrl: string; // optional book-trailer video URL
 }
 
 type ProductFormErrors = Partial<Record<keyof ProductFormData, string>>;
@@ -104,6 +107,8 @@ export const ProductForm = ({ product = null, onSubmit, isLoading = false, featu
     edition: "",
     fileFormat: "",
     tags: "",
+    coverColor: "",
+    videoUrl: "",
   });
 
   // Form validation errors
@@ -143,6 +148,8 @@ export const ProductForm = ({ product = null, onSubmit, isLoading = false, featu
         edition: product.edition || "",
         fileFormat: product.fileFormat || "",
         tags: product.tags && product.tags.length > 0 ? product.tags.join(", ") : "",
+        coverColor: product.coverColor || "",
+        videoUrl: product.videoUrl || "",
       };
 
       setFormData(formDataToSet);
@@ -279,6 +286,12 @@ export const ProductForm = ({ product = null, onSubmit, isLoading = false, featu
       if (normalizeValue(formData.tags) !== normalizeValue(product.tags && product.tags.length > 0 ? product.tags.join(", ") : "")) {
         changes.tags = formData.tags;
       }
+      if (normalizeValue(formData.coverColor) !== normalizeValue(product.coverColor)) {
+        changes.coverColor = formData.coverColor;
+      }
+      if (normalizeValue(formData.videoUrl) !== normalizeValue(product.videoUrl)) {
+        changes.videoUrl = formData.videoUrl;
+      }
 
       // Compare boolean fields (handle both Number 1/0 and Boolean true/false)
       const currentInStock = (product.in_stock as unknown) === 1 || product.in_stock === true;
@@ -344,6 +357,8 @@ export const ProductForm = ({ product = null, onSubmit, isLoading = false, featu
           .map((t) => t.trim())
           .filter(Boolean);
       }
+      if (changes.coverColor !== undefined) processedChanges.coverColor = changes.coverColor;
+      if (changes.videoUrl !== undefined) processedChanges.videoUrl = changes.videoUrl;
 
       submitData = processedChanges;
     } else {
@@ -563,6 +578,41 @@ export const ProductForm = ({ product = null, onSubmit, isLoading = false, featu
             <FormLabel htmlFor="tags">Tags</FormLabel>
             <FormInput id="tags" name="tags" type="text" value={formData.tags} onChange={handleChange} placeholder="e.g. react, hooks, frontend" />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Comma-separated genre/topic tags, used for related-product lookups</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Cover Art & Trailer Video (book-cover style enrichment) */}
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-white mb-1">Cover &amp; Media</h3>
+        <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+          Optional — set a cover color to display this product as a stylized 3D book cover instead of a flat image, and/or a trailer video shown on the product detail page.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <FormLabel htmlFor="coverColor">Cover Color</FormLabel>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                id="coverColorPicker"
+                aria-label="Pick cover color"
+                value={formData.coverColor || "#1e2a4b"}
+                onChange={(e) => setFormData((prev) => ({ ...prev, coverColor: e.target.value }))}
+                className="h-10 w-12 shrink-0 cursor-pointer rounded border border-gray-300 dark:border-gray-600 bg-transparent p-0.5"
+              />
+              <FormInput
+                id="coverColor"
+                name="coverColor"
+                type="text"
+                value={formData.coverColor}
+                onChange={handleChange}
+                placeholder="e.g. #1e2a4b"
+              />
+            </div>
+          </div>
+          <div>
+            <FormLabel htmlFor="videoUrl">Trailer Video URL</FormLabel>
+            <FormInput id="videoUrl" name="videoUrl" type="url" value={formData.videoUrl} onChange={handleChange} placeholder="https://.../trailer.mp4" />
           </div>
         </div>
       </div>

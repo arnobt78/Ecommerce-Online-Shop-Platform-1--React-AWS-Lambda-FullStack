@@ -1,6 +1,4 @@
-# CodeBook | E-Commerce Platform 1 – React, Vite, TypeScript, Express & PostgreSQL Full-Stack Project (including Storefront + Admin Dashboard + Role-Based Access Control + AI Business Insights)
-
-A modern, full-stack e-commerce platform for selling **computer science eBooks**. It includes a complete customer storefront (catalog, cart, Stripe checkout, address book, orders, reviews, support tickets) and a full **admin console** (products, orders, users, analytics, AI business insights, review moderation, tickets, activity log). The live API is an **Express + Prisma + PostgreSQL** backend in `backend/` (migrating away from the retired AWS Lambda + DynamoDB stack kept in `aws-lambda/` for reference). The frontend is a **React 19 + Vite + TypeScript** SPA with TanStack Query, Tailwind CSS, and JWT/Google OAuth auth.
+# CodeBook | E-Commerce Platform 1 – React, Vite, TypeScript, Express & PostgreSQL Full-Stack Project (including Storefront + Admin Panel + Role-Based Access Control + AI Business Insights & more)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![React](https://img.shields.io/badge/React-19.2-blue)](https://react.dev/)
@@ -13,6 +11,8 @@ A modern, full-stack e-commerce platform for selling **computer science eBooks**
 [![Stripe](https://img.shields.io/badge/Stripe-Payments-635BFF)](https://stripe.com/)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-red)](./SECURITY.md)
 [![launch with diploi badge](https://diploi.com/launch.svg)](https://diploi.com/launch/arnobt78/Ecommerce-Shop-1-BookStore--React-FullStack)
+
+A modern, full-stack e-commerce platform for selling **computer science eBooks**. It includes a complete customer storefront (catalog, cart, Stripe checkout, address book, orders, reviews, support tickets) and a full **admin console** (products, orders, users, analytics, AI business insights, review moderation, tickets, activity log). The live API is an **Express + Prisma + PostgreSQL** backend in `backend/` (migrating away from the retired AWS Lambda + DynamoDB stack kept in `aws-lambda/` for reference). The frontend is a **React 19 + Vite + TypeScript** SPA with TanStack Query, Tailwind CSS, and JWT/Google OAuth auth.
 
 - **Live demo (legacy AWS-backed showcase):** [https://codebook-aws.vercel.app/](https://codebook-aws.vercel.app/)
 - **Security:** private vulnerability reports → see [SECURITY.md](./SECURITY.md) · [contact@arnobmahmud.com](mailto:contact@arnobmahmud.com)
@@ -40,8 +40,6 @@ A modern, full-stack e-commerce platform for selling **computer science eBooks**
 ![Screenshot](https://github.com/user-attachments/assets/b16256c1-01c7-409a-89bc-6b3f58abaa19)
 ![Screenshot](https://github.com/user-attachments/assets/4cfb857f-c346-455d-a067-aa1464f520bb)
 ![Screenshot](https://github.com/user-attachments/assets/7bfcdb50-cb3c-47b8-88dd-cc456052abef)
-
----
 
 ## Table of Contents
 

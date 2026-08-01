@@ -71,6 +71,8 @@ interface RawProduct {
   edition?: string;
   fileFormat?: string;
   tags?: string[];
+  coverColor?: string;
+  videoUrl?: string;
 }
 
 async function seedProducts(): Promise<void> {
@@ -112,6 +114,8 @@ async function seedProducts(): Promise<void> {
       edition: p.edition || null,
       fileFormat: p.fileFormat || null,
       tags: p.tags || [],
+      coverColor: p.coverColor || null,
+      videoUrl: p.videoUrl || null,
     };
     await prisma.product.upsert({
       where: { id: p.id },

@@ -37,6 +37,11 @@ export interface Product {
   // this field existed (including entries already sitting in a user's
   // persisted localStorage query cache) may genuinely lack it at runtime.
   tags?: string[] | null;
+  // Cover art / trailer pass — optional, additive. Absent on rows seeded before
+  // this field existed, so every consumer must fall back to the flat image /
+  // hide the video block when null (see BookCover / ProductVideo).
+  coverColor?: string | null;
+  videoUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }

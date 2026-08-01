@@ -25,7 +25,7 @@ import { useAllOrders } from "../../hooks/useAdmin";
 import { useReviewsByProduct } from "../../hooks/useReviews";
 import { AdminLayout, useAdminLayout } from "../../components/Layouts/Admin";
 import { ProductQRCode } from "../../components/ProductQRCode";
-import { PageHeader, StatusBadge, LoadingState, ErrorState, Card } from "../../components/ui";
+import { PageHeader, StatusBadge, LoadingState, ErrorState, Card, BookCover, ProductVideo } from "../../components/ui";
 import { formatPrice } from "../../utils/formatPrice";
 import { getProductImageUrl, getProductImageKey } from "../../utils/productImage";
 import { calculateSingleProductAnalytics, type SingleProductAnalytics } from "../../services/analyticsService";
@@ -116,14 +116,28 @@ const AdminProductDetailContent = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: Product Image */}
               <div className="flex-shrink-0">
-                <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                  <img
-                    className="w-full h-auto rounded-lg object-cover"
-                    src={getProductImageUrl(product) || product.poster || undefined}
-                    key={getProductImageKey(product)}
-                    alt={product.name}
-                  />
+                <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                  {product.coverColor ? (
+                    <div className="flex w-full items-center justify-center bg-gradient-to-b from-gray-100 to-gray-200 py-6 dark:from-gray-800 dark:to-gray-950">
+                      <div className="aspect-[143/199] w-48 sm:w-56 drop-shadow-[0_18px_20px_rgba(0,0,0,0.25)]">
+                        <BookCover
+                          variant="fill"
+                          coverColor={product.coverColor}
+                          coverImage={getProductImageUrl(product) || product.poster}
+                          alt={product.name}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      className="w-full h-auto rounded-lg object-cover"
+                      src={getProductImageUrl(product) || product.poster || undefined}
+                      key={getProductImageKey(product)}
+                      alt={product.name}
+                    />
+                  )}
                 </div>
+                <ProductVideo videoUrl={product.videoUrl} className="mt-4" />
               </div>
 
               {/* Right: Product Information */}

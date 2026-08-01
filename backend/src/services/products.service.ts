@@ -38,6 +38,9 @@ export const createProductSchema = z.object({
   edition: z.string().nullish(),
   fileFormat: z.string().nullish(),
   tags: z.array(z.string()).nullish(),
+  // Cover art / trailer pass (see schema.prisma) — hex color and trailer video URL.
+  coverColor: z.string().nullish(),
+  videoUrl: z.string().nullish(),
 });
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 
@@ -124,6 +127,8 @@ export async function createProduct(
       edition: productData.edition || null,
       fileFormat: productData.fileFormat || null,
       tags: productData.tags || [],
+      coverColor: productData.coverColor || null,
+      videoUrl: productData.videoUrl || null,
     },
   });
 
@@ -165,6 +170,8 @@ const ALLOWED_UPDATE_FIELDS = [
   "edition",
   "fileFormat",
   "tags",
+  "coverColor",
+  "videoUrl",
 ] as const;
 
 export async function updateProduct(

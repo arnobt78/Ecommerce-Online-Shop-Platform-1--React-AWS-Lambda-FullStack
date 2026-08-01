@@ -21,6 +21,7 @@ import { AdminLayout, useAdminLayout } from "../../components/Layouts/Admin";
 import { AdminMetricsCard } from "./components/AdminMetricsCard";
 import { AdminRecentOrders } from "./components/AdminRecentOrders";
 import { AdminStatsSkeleton } from "./components/AdminStatsSkeleton";
+import { AdminCatalogInsights } from "./components/AdminCatalogInsights";
 import { PageHeader, ErrorState, Card, ScrollReveal, StaggerContainer, StaggerItem } from "../../components/ui";
 import type { Order } from "../../types";
 
@@ -136,6 +137,28 @@ const AdminDashboardContent = () => {
           <ScrollReveal direction="bottom">
             <AdminRecentOrders orders={metrics.allOrders || []} />
           </ScrollReveal>
+
+          {/* Catalog Insights — category/year/language breakdowns, top rated, health */}
+          {stats && (
+            <ScrollReveal direction="bottom">
+              <AdminCatalogInsights
+                categoryStats={stats.categoryStats || []}
+                productsByYear={stats.productsByYear || []}
+                productsByLanguage={stats.productsByLanguage || []}
+                topRatedProducts={stats.topRatedProducts || []}
+                catalogHealth={
+                  stats.catalogHealth || {
+                    productsWithIsbn: 0,
+                    productsWithPublisher: 0,
+                    averagePages: 0,
+                    inStockProducts: 0,
+                    outOfStockProducts: 0,
+                  }
+                }
+                totalProducts={metrics.totalProducts}
+              />
+            </ScrollReveal>
+          )}
         </>
       )}
     </div>

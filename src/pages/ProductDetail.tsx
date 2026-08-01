@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { DollarSign, Star, XCircle, AlertTriangle, CheckCircle2, FileText, Bookmark, BarChart3, BookOpen, User, ShoppingCart, Trash2, Barcode, Hash, Building2, Calendar, Layers, Globe, Tag } from "lucide-react";
+import { Star, XCircle, AlertTriangle, CheckCircle2, FileText, BookOpen, User, ShoppingCart, Trash2, Barcode, Hash, Building2, Calendar, Layers, Globe, Tag, BarChart3, type LucideIcon } from "lucide-react";
 import { toast } from "../lib/toast";
 import { useTitle } from "../hooks/useTitle";
 import {
@@ -34,6 +34,16 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import type { Product, Review } from "../types";
+
+// Info-grid row — one line of the "Book Details" panel. Keeps the panel a
+// tidy, scannable list instead of the old wall-of-colored-pills layout.
+const DetailRow = ({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string | number }) => (
+  <div className="flex items-center gap-2.5 text-sm">
+    <Icon className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500" strokeWidth={2} />
+    <span className="text-gray-500 dark:text-gray-400">{label}</span>
+    <span className="ml-auto font-medium text-gray-700 dark:text-gray-200">{value}</span>
+  </div>
+);
 
 export const ProductDetail = () => {
   const { cartList, addToCart, removeFromCart } = useCart();
@@ -215,298 +225,169 @@ export const ProductDetail = () => {
     return <ProductDetailSkeleton />;
   }
 
+  const isOut = product.stock === 0 || (product.stock == null && !product.in_stock);
+  const isLow = !isOut && product.stock != null && product.stock <= (product.lowStockThreshold || 10);
+  const StockIcon = isOut ? XCircle : isLow ? AlertTriangle : CheckCircle2;
+  const stockLabel = isOut
+    ? "Out of Stock"
+    : product.stock != null
+      ? isLow
+        ? `Low stock — only ${product.stock} left`
+        : `${product.stock} in stock`
+      : "In Stock";
+  const stockColorClass = isOut
+    ? "text-rose-700 dark:text-rose-400"
+    : isLow
+      ? "text-amber-700 dark:text-amber-400"
+      : "text-emerald-700 dark:text-emerald-400";
+
+  const hasBookDetails = Boolean(
+    product.publisher || product.publishedYear || product.edition || product.language || product.fileFormat || product.isbn || product.sku || product.pages || product.category || product.level,
+  );
+
   return (
     <main>
-      <section className="py-8 sm:py-10">
-        {/* Title and Overview */}
-        <div className="text-center mb-4">
-          <h1 className="text-3xl sm:text-4xl font-medium text-gray-700 dark:text-slate-200">
-            {product.name}
-          </h1>
-          <p className="mb-2 text-base sm:text-lg text-center text-gray-700 dark:text-slate-300 max-w-7xl mx-auto">
-            {product.overview}
-          </p>
-        </div>
-
-        {/* Main Content Card */}
-        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm dark:shadow-slate-900/50 p-4 sm:p-6 lg:p-8">
-          <div className="flex flex-col lg:flex-row lg:items-stretch gap-4 lg:gap-8">
-            {/* Left Section - Product Image */}
-            <div className="flex-shrink-0 w-full lg:w-auto lg:max-w-xl">
-              <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 h-full flex items-center justify-center">
-                {product.coverColor ? (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-gray-100 to-gray-200 py-8 dark:from-slate-800 dark:to-slate-950">
-                    <div className="aspect-[143/199] h-full max-h-[30rem] drop-shadow-[0_24px_28px_rgba(0,0,0,0.3)]">
-                      <BookCover
-                        variant="fill"
-                        coverColor={product.coverColor}
-                        coverImage={getProductImageUrl(product) || product.poster}
-                        alt={product.name}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <img
-                    className="w-full h-full rounded-lg object-cover"
-                    src={getProductImageUrl(product) || product.poster || undefined}
-                    key={getProductImageKey(product)}
-                    alt={product.name}
-                  />
-                )}
-              </div>
-
-              {/* Book trailer — only rendered when the product has a videoUrl */}
-              <ProductVideo videoUrl={product.videoUrl} className="mt-4" />
-            </div>
-
-            {/* Right Section - Product Details Card */}
-            <div className="flex-1 min-w-0 flex flex-col">
-              {/* Flex Layout: QR Code on top right parallel to price/rating/badges/add button */}
-              <div className="flex flex-col lg:flex-row lg:items-start gap-4 lg:gap-6 mb-4">
-                {/* Product Details (Price, Rating, Badges, Add to Cart) - Wrapped in inner div */}
-                <div className="flex-1 min-w-0 space-y-2 sm:space-y-2">
-                  {/* Price Badge */}
-                  <div>
-                    <span className="inline-flex items-center px-4 py-2 rounded-lg text-2xl sm:text-3xl font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800">
-                      <DollarSign className="h-5 w-5 mr-1.5" strokeWidth={2} />
-                      {product.price?.toFixed(2) || "0.00"}
-                    </span>
-                  </div>
-
-                  {/* Rating */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <div className="flex items-center flex-shrink-0">
-                      <Rating rating={displayRating} />
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-slate-400 flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-1">
-                      <span>({displayRating.toFixed(1)} out of 5)</span>
-                      {reviewCount > 0 && (
-                        <>
-                          <span className="hidden sm:inline"> · </span>
-                          <span>
-                            {reviewCount}{" "}
-                            {reviewCount === 1 ? "review" : "reviews"}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Product Badges */}
-                  <div className="flex flex-wrap gap-2">
-                    {product.best_seller && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                        <Star className="h-3.5 w-3.5 mr-1.5" strokeWidth={2} fill="currentColor" />
-                        Best Seller
-                      </span>
-                    )}
-                    {/* Stock Quantity Badge - Show detailed stock info if available */}
-                    {product.stock !== undefined ? (
-                      <span
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
-                          product.stock === 0
-                            ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800"
-                            : product.stock! <= (product.lowStockThreshold || 10)
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200 dark:border-amber-800"
-                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-                        }`}
-                      >
-                        {(() => {
-                          const isOut = product.stock === 0;
-                          const isLow = !isOut && product.stock! <= (product.lowStockThreshold || 10);
-                          const StockIcon = isOut ? XCircle : isLow ? AlertTriangle : CheckCircle2;
-                          return <StockIcon className="h-3.5 w-3.5 mr-1.5" strokeWidth={2} />;
-                        })()}
-                        {product.stock === 0
-                          ? "Out of Stock"
-                          : product.stock! <= (product.lowStockThreshold || 10)
-                            ? `Low Stock (${product.stock} left)`
-                            : `${product.stock} in stock`}
-                      </span>
-                    ) : // Fallback to in_stock boolean if stock quantity not available
-                    product.in_stock ? (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" strokeWidth={2} />
-                        In Stock
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                        <XCircle className="h-3.5 w-3.5 mr-1.5" strokeWidth={2} />
-                        Out of Stock
-                      </span>
-                    )}
-                    {product.size && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-sky-800 dark:bg-blue-900/30 dark:text-sky-300 border border-blue-200 dark:border-blue-800">
-                        <FileText className="h-3.5 w-3.5 mr-1.5" strokeWidth={2} />
-                        {product.size} MB
-                      </span>
-                    )}
-                    {product.category && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                        <Bookmark className="h-3.5 w-3.5 mr-1.5" strokeWidth={2} />
-                        {product.category}
-                      </span>
-                    )}
-                    {product.level && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                        <BarChart3 className="h-3.5 w-3.5 mr-1.5" strokeWidth={2} />
-                        {product.level}
-                      </span>
-                    )}
-                    {product.pages && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
-                        <BookOpen className="h-3.5 w-3.5 mr-1.5" strokeWidth={2} />
-                        {product.pages} pages
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Author */}
-                  {product.author && (
-                    <p className="text-sm text-gray-600 dark:text-slate-400">
-                      <User className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" strokeWidth={2} />
-                      By{" "}
-                      <span className="font-medium text-gray-700 dark:text-slate-300">
-                        {product.author}
-                      </span>
-                    </p>
-                  )}
-
-                  {/* Book Details (REQ-1616: catalog metadata) */}
-                  {(product.isbn || product.publisher || product.publishedYear || product.edition || product.language || product.fileFormat || (product.tags?.length ?? 0) > 0) && (
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                      <h3 className="text-sm font-medium text-gray-700 dark:text-white mb-3">Book Details</h3>
-                      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        {product.publisher && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <Building2 className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} />
-                            <dt className="sr-only">Publisher</dt>
-                            <dd>{product.publisher}</dd>
-                          </div>
-                        )}
-                        {product.publishedYear && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <Calendar className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} />
-                            <dt className="sr-only">Published</dt>
-                            <dd>Published {product.publishedYear}</dd>
-                          </div>
-                        )}
-                        {product.edition && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <Layers className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} />
-                            <dt className="sr-only">Edition</dt>
-                            <dd>{product.edition}</dd>
-                          </div>
-                        )}
-                        {product.language && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <Globe className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} />
-                            <dt className="sr-only">Language</dt>
-                            <dd>{product.language}</dd>
-                          </div>
-                        )}
-                        {product.fileFormat && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <FileText className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} />
-                            <dt className="sr-only">Format</dt>
-                            <dd>{product.fileFormat}</dd>
-                          </div>
-                        )}
-                        {product.isbn && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <Barcode className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} />
-                            <dt className="sr-only">ISBN</dt>
-                            <dd>ISBN {product.isbn}</dd>
-                          </div>
-                        )}
-                        {product.sku && (
-                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <Hash className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={2} />
-                            <dt className="sr-only">SKU</dt>
-                            <dd>SKU {product.sku}</dd>
-                          </div>
-                        )}
-                      </dl>
-                      {(product.tags?.length ?? 0) > 0 && (
-                        <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                          <Tag className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" strokeWidth={2} />
-                          {(product.tags || []).map((tag) => (
-                            <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Add to Cart Button */}
-                  <div className="py-2">
-                    {!inCart ? (
-                      <button
-                        onClick={() => {
-                          // Prevent adding out-of-stock items
-                          if (!product.in_stock) {
-                            return;
-                          }
-                          addToCart(product);
-                        }}
-                        disabled={!product.in_stock}
-                        className={`inline-flex items-center justify-center py-3 px-6 text-base sm:text-lg font-medium text-center text-white rounded-lg transition-colors ${
-                          product.in_stock
-                            ? "bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-700"
-                            : "bg-gray-400 cursor-not-allowed"
-                        }`}
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" strokeWidth={2} />
-                        Add To Cart
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => removeFromCart(product)}
-                        className={`inline-flex items-center justify-center py-3 px-6 text-base sm:text-lg font-medium text-center text-white rounded-lg transition-colors ${
-                          product.in_stock
-                            ? "bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
-                            : "bg-gray-400 cursor-not-allowed"
-                        }`}
-                        disabled={!product.in_stock}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" strokeWidth={2} />
-                        Remove From Cart
-                      </button>
-                    )}
+      <section className="py-6 sm:py-10">
+        {/* Hero: cover art + purchase panel, side by side, no heavy outer card */}
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+          {/* Left — cover, trailer, QR (secondary/utility, not competing with Buy) */}
+          <div className="mx-auto w-full max-w-xs flex-shrink-0 lg:mx-0 lg:w-72">
+            <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-gray-50 dark:border-slate-700 dark:bg-slate-900">
+              {product.coverColor ? (
+                <div className="flex w-full items-center justify-center bg-gradient-to-b from-gray-100 to-gray-200 py-8 dark:from-slate-800 dark:to-slate-950">
+                  <div className="aspect-[143/199] w-40 drop-shadow-[0_24px_28px_rgba(0,0,0,0.3)] sm:w-48">
+                    <BookCover variant="fill" coverColor={product.coverColor} coverImage={getProductImageUrl(product) || product.poster} alt={product.name} />
                   </div>
                 </div>
+              ) : (
+                <img
+                  className="aspect-[143/199] w-full rounded-xl object-cover"
+                  src={getProductImageUrl(product) || product.poster || undefined}
+                  key={getProductImageKey(product)}
+                  alt={product.name}
+                />
+              )}
+            </div>
 
-                {/* QR Code Card - Top Right (beside product details) */}
-                {(product.qrCode || productUrl) && (
-                  <div className="flex-shrink-0 w-full lg:w-auto lg:max-w-[200px]">
-                    <ProductQRCode
-                      qrCode={product.qrCode}
-                      productUrl={productUrl}
-                      productName={product.name}
-                      productId={product.id}
-                      className="w-full"
-                    />
+            <ProductVideo videoUrl={product.videoUrl} className="mt-4" />
+
+            {(product.qrCode || productUrl) && (
+              <details className="group mt-4 rounded-lg border border-gray-200 dark:border-slate-700">
+                <summary className="cursor-pointer list-none px-4 py-2.5 text-xs font-medium text-gray-500 dark:text-gray-400 [&::-webkit-details-marker]:hidden">
+                  Share via QR code
+                </summary>
+                <div className="border-t border-gray-200 p-4 dark:border-slate-700">
+                  <ProductQRCode qrCode={product.qrCode} productUrl={productUrl} productName={product.name} productId={product.id} className="w-full" />
+                </div>
+              </details>
+            )}
+          </div>
+
+          {/* Right — everything the shopper needs to decide + buy */}
+          <div className="min-w-0 flex-1">
+            {product.category && (
+              <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">{product.category}</span>
+            )}
+            <h1 className="mt-1 text-2xl font-semibold text-gray-800 dark:text-white sm:text-3xl">{product.name}</h1>
+            {product.author && (
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <User className="-mt-0.5 mr-1 inline h-3.5 w-3.5" strokeWidth={2} />
+                by <span className="font-medium text-gray-700 dark:text-gray-300">{product.author}</span>
+              </p>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Rating rating={displayRating} />
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {displayRating.toFixed(1)}
+                {reviewCount > 0 ? ` · ${reviewCount} ${reviewCount === 1 ? "review" : "reviews"}` : ""}
+              </span>
+              {product.best_seller && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                  <Star className="h-3 w-3" strokeWidth={2} fill="currentColor" />
+                  Best Seller
+                </span>
+              )}
+            </div>
+
+            {product.overview && <p className="mt-4 text-base leading-relaxed text-gray-600 dark:text-slate-300">{product.overview}</p>}
+
+            <div className="mt-6 flex items-end gap-4">
+              <span className="text-3xl font-bold text-gray-800 dark:text-white sm:text-4xl">${product.price?.toFixed(2) || "0.00"}</span>
+              <span className={`mb-1 flex items-center gap-1.5 text-sm font-medium ${stockColorClass}`}>
+                <StockIcon className="h-4 w-4" strokeWidth={2} />
+                {stockLabel}
+              </span>
+            </div>
+
+            <div className="mt-4">
+              {!inCart ? (
+                <button
+                  onClick={() => {
+                    // Prevent adding out-of-stock items
+                    if (!product.in_stock) return;
+                    addToCart(product);
+                  }}
+                  disabled={!product.in_stock}
+                  className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3.5 text-base font-medium text-white transition-colors sm:w-auto ${
+                    product.in_stock ? "bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-700" : "cursor-not-allowed bg-gray-400"
+                  }`}
+                >
+                  <ShoppingCart className="h-5 w-5" strokeWidth={2} />
+                  Add To Cart
+                </button>
+              ) : (
+                <button
+                  onClick={() => removeFromCart(product)}
+                  disabled={!product.in_stock}
+                  className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3.5 text-base font-medium text-white transition-colors sm:w-auto ${
+                    product.in_stock ? "bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800" : "cursor-not-allowed bg-gray-400"
+                  }`}
+                >
+                  <Trash2 className="h-5 w-5" strokeWidth={2} />
+                  Remove From Cart
+                </button>
+              )}
+            </div>
+
+            {/* Book Details — a tidy scannable grid instead of a wall of colored pills */}
+            {hasBookDetails && (
+              <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50 sm:p-5">
+                <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-white">Book Details</h2>
+                <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                  {product.publisher && <DetailRow icon={Building2} label="Publisher" value={product.publisher} />}
+                  {product.publishedYear && <DetailRow icon={Calendar} label="Published" value={product.publishedYear} />}
+                  {product.edition && <DetailRow icon={Layers} label="Edition" value={product.edition} />}
+                  {product.language && <DetailRow icon={Globe} label="Language" value={product.language} />}
+                  {product.fileFormat && <DetailRow icon={FileText} label="Format" value={product.fileFormat} />}
+                  {product.pages && <DetailRow icon={BookOpen} label="Pages" value={product.pages} />}
+                  {product.level && <DetailRow icon={BarChart3} label="Level" value={product.level} />}
+                  {product.isbn && <DetailRow icon={Barcode} label="ISBN" value={product.isbn} />}
+                  {product.sku && <DetailRow icon={Hash} label="SKU" value={product.sku} />}
+                  {product.size && <DetailRow icon={FileText} label="Size" value={`${product.size} MB`} />}
+                </div>
+                {(product.tags?.length ?? 0) > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
+                    <Tag className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" strokeWidth={2} />
+                    {(product.tags || []).map((tag) => (
+                      <span key={tag} className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
-
-              {/* Divider */}
-              <div className="border-t border-gray-200 dark:border-slate-700 pt-1 sm:pt-1 mt-4"></div>
-
-              {/* Product Description */}
-              <div>
-                <h2 className="text-xl sm:text-2xl font-medium text-gray-700 dark:text-slate-200 mb-2">
-                  Description
-                </h2>
-                <p className="text-base sm:text-lg text-gray-700 dark:text-slate-300 leading-relaxed whitespace-pre-line text-justify">
-                  {product.long_description}
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
+
+        {/* Description — its own full-width section, separated from the hero */}
+        {product.long_description && (
+          <Card className="mt-8 p-4 sm:p-6 lg:p-8">
+            <h2 className="mb-3 text-xl font-semibold text-gray-800 dark:text-white">Description</h2>
+            <p className="whitespace-pre-line text-base leading-relaxed text-gray-600 dark:text-slate-300">{product.long_description}</p>
+          </Card>
+        )}
 
         {/* Recommendations — auto-scrolling reel, pauses on hover, manual chevrons */}
         {recommendedProducts && recommendedProducts.length > 0 && (

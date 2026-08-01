@@ -8,7 +8,7 @@
 
 import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
 import { Info } from "lucide-react";
-import { FormInput, FormLabel, FormTextarea, FormCheckbox, FormSelect, FormError, ImageUpload, RippleButton } from "../../../components/ui";
+import { FormInput, FormLabel, FormTextarea, FormCheckbox, FormSelect, FormError, ImageUpload, RippleButton, BookCover } from "../../../components/ui";
 import { useImageUpload } from "../../../hooks/useImageUpload";
 import type { Product } from "../../../types";
 
@@ -586,33 +586,53 @@ export const ProductForm = ({ product = null, onSubmit, isLoading = false, featu
       <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
         <h3 className="text-sm font-medium text-gray-700 dark:text-white mb-1">Cover &amp; Media</h3>
         <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
-          Optional — set a cover color to display this product as a stylized 3D book cover instead of a flat image, and/or a trailer video shown on the product detail page.
+          Optional — set a cover color to display this product as a stylized 3D book cover (using the image above) instead of a flat image, and/or a trailer video shown on the product detail page.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <FormLabel htmlFor="coverColor">Cover Color</FormLabel>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                id="coverColorPicker"
-                aria-label="Pick cover color"
-                value={formData.coverColor || "#1e2a4b"}
-                onChange={(e) => setFormData((prev) => ({ ...prev, coverColor: e.target.value }))}
-                className="h-10 w-12 shrink-0 cursor-pointer rounded border border-gray-300 dark:border-gray-600 bg-transparent p-0.5"
-              />
-              <FormInput
-                id="coverColor"
-                name="coverColor"
-                type="text"
-                value={formData.coverColor}
-                onChange={handleChange}
-                placeholder="e.g. #1e2a4b"
-              />
+        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-6">
+          {/* Live preview — reacts to the color picker/hex input and the product image above in real time */}
+          <div className="flex flex-col items-center gap-2">
+            <div className="aspect-[143/199] w-28">
+              <BookCover variant="fill" coverColor={formData.coverColor || "#94a3b8"} coverImage={formData.image_local || null} alt="Cover preview" />
             </div>
+            <span className="text-xs text-gray-400 dark:text-gray-500">Preview</span>
           </div>
-          <div>
-            <FormLabel htmlFor="videoUrl">Trailer Video URL</FormLabel>
-            <FormInput id="videoUrl" name="videoUrl" type="url" value={formData.videoUrl} onChange={handleChange} placeholder="https://.../trailer.mp4" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FormLabel htmlFor="coverColor">Cover Color</FormLabel>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  id="coverColorPicker"
+                  aria-label="Pick cover color"
+                  value={formData.coverColor || "#1e2a4b"}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, coverColor: e.target.value }))}
+                  className="h-10 w-12 shrink-0 cursor-pointer rounded border border-gray-300 dark:border-gray-600 bg-transparent p-0.5"
+                />
+                <FormInput
+                  id="coverColor"
+                  name="coverColor"
+                  type="text"
+                  value={formData.coverColor}
+                  onChange={handleChange}
+                  placeholder="e.g. #1e2a4b"
+                />
+                {formData.coverColor && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, coverColor: "" }))}
+                    className="shrink-0 whitespace-nowrap px-2 py-2 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Avoid white/near-white — it hides the cover&apos;s decorative spine lines.</p>
+            </div>
+            <div>
+              <FormLabel htmlFor="videoUrl">Trailer Video URL</FormLabel>
+              <FormInput id="videoUrl" name="videoUrl" type="url" value={formData.videoUrl} onChange={handleChange} placeholder="https://.../trailer.mp4" />
+            </div>
           </div>
         </div>
       </div>

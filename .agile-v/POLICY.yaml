@@ -1,0 +1,35 @@
+version: 1
+profile: lightweight-solo
+project: CodeBook E-Commerce Platform
+updated: 2026-07-30
+
+risk_tiers:
+  R0: "Docs, comments, styling-only, non-shipped scripts"
+  R1: "UI/component changes with no data or money impact"
+  R2: "Business logic, admin operations, non-destructive data writes"
+  R3: "Auth, payments, destructive data ops (delete/refund), infra/deploy config"
+
+gate1_requirements:
+  - REQUIREMENTS.md entries reviewed by Logic Gatekeeper (ambiguity + hardware/platform constraints)
+  - No REQ-ID conflicts with existing baseline
+
+gate2_requirements:
+  R0: waived_auto
+  R1: waived_auto_with_red_team_spotcheck
+  R2: red_team_verification_required
+  R3: red_team_verification_required_plus_human_approval
+
+eval_gate:
+  required_for: [R2, R3]
+  waivable_by: "Arnob Mahmud (repo owner)"
+  evidence_file: EVAL_RESULTS.md
+
+human_gate_notify:
+  - Any change touching aws-lambda/functions/payment/**
+  - Any change touching aws-lambda/functions/auth/**
+  - Any destructive git operation (reset --hard, force-push, branch -D, rm -rf)
+  - Any commit of the pending repo-flatten restructure (REQ-1101/REQ-1102)
+
+secrets_policy:
+  - Never read/print contents of .env, aws-lambda/.env.secrets in full
+  - Flag any accidental secret exposure in diffs before commit

@@ -1,0 +1,19 @@
+# YAML Lint Configuration for AWS SAM Templates
+#
+# This file tells the YAML linter to ignore CloudFormation intrinsic functions
+# like !Ref, !Sub, !GetAtt, etc. These are valid in AWS SAM/CloudFormation templates.
+
+extends: default
+
+rules:
+  # Allow CloudFormation intrinsic functions
+  document-start: disable
+  line-length: disable
+  # Suppress warnings for CloudFormation intrinsic function tags
+  # These are valid in AWS SAM/CloudFormation templates
+  tags:
+    # Allow all tags (including !Ref, !Sub, !GetAtt, etc.)
+    allowed-tags: []
+    # Don't require tags to be defined
+    check-keys: false
+

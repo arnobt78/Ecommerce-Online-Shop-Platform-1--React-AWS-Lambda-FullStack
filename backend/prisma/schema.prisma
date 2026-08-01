@@ -1,0 +1,184 @@
+// CodeBook E-Commerce — Prisma schema (PostgreSQL)
+// Replaces the AWS DynamoDB tables 1:1 in domain shape so API response
+// contracts stay identical to the AWS Lambda backend (REQ-1200, REQ-1202).
+// Field names intentionally match the JSON keys the frontend already expects
+// (snake_case where the Lambda backend used snake_case) to avoid a translation
+// layer and reduce migration risk.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Parent: REQ-1202, REQ-1506. Extends the original codebook-users table with
+// Google OAuth + avatar fields (REQ-1500-1507) not present in the AWS backend.
+model User {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  password            String? // nullable: Google-only accounts have no password
+  name                String?
+  role                String    @default("user") // "user" | "admin" — unchanged from AWS backend
+  image               String? // profile picture URL (Google) — REQ-1506
+  googleId            String?   @unique // links a Google account — REQ-1506
+  emailVerified       DateTime? // REQ-1506
+  notificationsReadAt DateTime? // unchanged from AWS backend (shared/users.js)
+  isDemo              Boolean   @default(false) // REQ-1510: marks seeded demo accounts eligible for the login page's one-click quick-login list
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  addresses           Address[] // REQ-1618: address book
+
+  @@index([role])
+}
+
+// Parent: REQ-1618. Customer address book — one row per saved address, with
+// a single isDefault flag per user (enforced in the service layer, not a DB
+// constraint, since Prisma has no partial-unique-index support here).
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String? // e.g. "Home", "Work" — optional freeform tag
+  fullName  String
+  street1   String
+  street2   String?
+  city      String
+  state     String
+  zip       String
+  country   String   @default("US")
+  phone     String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Parent: REQ-1202. Matches aws-lambda/shared/products.js item shape.
+model Product {
+  id                String   @id @default(uuid())
+  name              String
+  author            String? // REQ-1511: enriched catalog metadata
+  category          String? // e.g. "Frontend Development", "Backend Development"
+  level             String? // e.g. "Beginner", "Intermediate", "Advanced"
+  pages             Int?
+  price             Float
+  overview          String?
+  long_description  String?
+  image_local       String?
+  poster            String?
+  in_stock          Boolean  @default(true)
+  stock             Int?
+  lowStockThreshold Int?
+  best_seller       Boolean  @default(false)
+  featured_product  Int      @default(0) // 1 = featured, 0 = not (kept as Int for parity with AWS GSI design; max 3 enforced in service layer)
+  rating            Float?
+  size              Int? // file size in MB (ebook download) — confirmed Int from data/db.json, not a clothing/apparel size
+  qrCode            String?
+  // REQ-1616: catalog/inventory metadata pass — digital-book-appropriate fields only
+  // (no weight/dimensions/warehouse: the storefront's own FAQ confirms every title
+  // is a pure digital download delivered via the Dashboard, never physically shipped).
+  sku               String?  @unique // internal catalog/license code, e.g. "CB-FE-1001"
+  isbn              String? // ISBN-13, still meaningful metadata for a digital edition
+  publisher         String?
+  publishedYear     Int?
+  language          String?
+  edition           String?
+  fileFormat        String? // "PDF" | "EPUB" | "PDF + EPUB"
+  tags              String[] @default([]) // genres/topics — used for related-products lookups
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([featured_product])
+}
+
+// Parent: REQ-1202. Matches aws-lambda/shared/orders.js item shape.
+// `user` is stored as a denormalized snapshot (id/name/email) exactly like the
+// DynamoDB item did, so the API response shape doesn't change for the frontend.
+model Order {
+  id              String    @id @default(uuid())
+  userId          String
+  user            Json // { id, name, email } snapshot at order time
+  cartList        Json // array of cart line items
+  amount_paid     Float
+  quantity        Int
+  status          String    @default("pending") // pending | processing | shipped | delivered | cancelled | refunded
+  paymentIntentId String?
+  paymentStatus   String?
+  trackingNumber  String?
+  trackingCarrier String?
+  labelUrl        String?
+  // REQ-1620: snapshot of the customer-selected saved Address at checkout time
+  // (not a relation — orders must keep their own copy even if the address is
+  // later edited/deleted). shipping.service.ts already reads this field name.
+  shippingAddress Json?
+  refundId        String?
+  refundAmount    Int?
+  refundedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Parent: REQ-1202. Matches aws-lambda/shared/activityLog.js item shape.
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String
+  userEmail  String?
+  userName   String?
+  action     String // create | update | delete | status_change
+  entityType String // order | product | user
+  entityId   String
+  details    Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType])
+}
+
+// Parent: REQ-1202. Matches aws-lambda/shared/tickets.js item shape.
+// `messages` is stored as a JSON array of {id, senderId, senderEmail, senderName, senderRole, message, createdAt}
+// exactly like the DynamoDB item did.
+model Ticket {
+  id            String   @id @default(uuid())
+  userId        String
+  customerEmail String
+  customerName  String   @default("Customer")
+  subject       String
+  status        String   @default("open") // open | in_progress | resolved | closed
+  messages      Json     @default("[]")
+  // REQ-1619: triage metadata
+  priority      String   @default("medium") // low | medium | high | urgent
+  category      String   @default("other") // billing | technical | refund | account | other
+  orderId       String? // optional: which order this ticket concerns (e.g. a refund request)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Parent: REQ-1202. Matches aws-lambda/shared/reviews.js item shape.
+model Review {
+  id           String    @id @default(uuid())
+  productId    String
+  userId       String
+  orderId      String
+  rating       Int
+  comment      String
+  userName     String    @default("Customer")
+  userEmail    String    @default("")
+  status       String    @default("approved") // approved | pending | rejected
+  // REQ-1619: public seller response to a review
+  adminReply   String?
+  adminReplyAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([productId])
+  @@index([userId])
+}

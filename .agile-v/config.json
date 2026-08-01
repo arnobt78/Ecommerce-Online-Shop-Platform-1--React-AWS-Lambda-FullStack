@@ -1,0 +1,42 @@
+{
+  "project": "CodeBook E-Commerce Platform",
+  "repo": "ecommerce-codebook",
+  "owner": "Arnob Mahmud",
+  "cycle": "C1",
+  "cycle_type": "brownfield-baseline",
+  "created": "2026-07-30",
+  "stack": {
+    "frontend": "React 19 (Create React App / react-scripts 5) + React Router 7 + TanStack Query 5 + Tailwind CSS 3",
+    "payments": "Stripe (@stripe/react-stripe-js, @stripe/stripe-js)",
+    "backend": "AWS Lambda (Node.js) + HTTP API Gateway",
+    "data": "AWS DynamoDB (@aws-sdk/client-dynamodb, lib-dynamodb)",
+    "auth": "JWT (jsonwebtoken) + bcryptjs, role-based access control",
+    "hosting": "Vercel (frontend)",
+    "integrations": ["Cloudinary (images)", "Brevo (email)", "Shippo (shipping labels)"]
+  },
+  "active_domain_skill": "build-agent-js",
+  "req_id_format": "REQ-####",
+  "req_ranges": {
+    "0001-0099": "Platform / Architecture / Repo Structure",
+    "0100-0199": "Authentication & Authorization",
+    "0200-0299": "Product Catalog",
+    "0300-0399": "Cart & Checkout / Payments",
+    "0400-0499": "Orders & Fulfillment",
+    "0500-0599": "Reviews",
+    "0600-0699": "Support Tickets",
+    "0700-0799": "Notifications",
+    "0800-0899": "Admin Dashboard & Analytics",
+    "0900-0999": "Email / Transactional Messaging",
+    "1000-1099": "Activity Logging / Audit Trail",
+    "1100-1199": "Repo Restructure / Infra Migration (open thread)",
+    "1200-1299": "Backend Platform Migration (AWS Lambda+DynamoDB -> Express+Postgres on VPS)",
+    "1300-1399": "TypeScript Migration (frontend + backend)",
+    "1400-1499": "Cache / Invalidation / Realtime UX Contract",
+    "1500-1599": "Google OAuth Sign-In (new feature)",
+    "1600-1699": "UI/UX Consistency (toasts, confirmations, content quality, demo login)"
+  },
+  "policy_profile": "lightweight-solo",
+  "gate2_default": "WAIVED for R0/R1 (UI, docs, styling); REQUIRED for R2/R3 (auth, payments, data-destructive, infra)",
+  "compliance_auditor_active": true,
+  "red_team_verifier_active": true
+}

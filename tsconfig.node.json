@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "composite": true,
+    "skipLibCheck": true,
+    // Composite projects can't fully disable emit, but nothing consumes this
+    // project's output (it only exists so `tsc -b` type-checks vite.config.ts)
+    // — redirect emit + incremental buildinfo into node_modules/ (gitignored)
+    // instead of littering the repo root with vite.config.js/.d.ts.
+    "outDir": "node_modules/.tsbuildcache/node",
+    "tsBuildInfoFile": "node_modules/.tsbuildcache/node/tsconfig.node.tsbuildinfo"
+  },
+  "include": ["vite.config.ts"]
+}

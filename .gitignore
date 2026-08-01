@@ -1,168 +1,62 @@
-# ============================================
-# CodeBook E-Commerce - Git Ignore Rules
-# ============================================
-# This file ensures sensitive data, build artifacts, and dependencies are NOT committed to Git
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Note: Root .gitignore handles most patterns. This file is for codebook-specific ignores.
 
-# ============================================
-# DEPENDENCIES (Recursive - all node_modules)
-# ============================================
+# dependencies (use root-level patterns, but also catch this directory)
 node_modules/
 **/node_modules/
 .pnp
 .pnp.js
 
-# ============================================
-# BUILD ARTIFACTS (Recursive)
-# ============================================
+# testing
+coverage/
+**/coverage/
+
+# production
 build/
 **/build/
 dist/
 **/dist/
-.aws-sam/
-**/.aws-sam/
-out/
-**/out/
-.next/
-.nuxt/
-.parcel-cache/
 
-# ============================================
-# SECRETS & CREDENTIALS (NEVER COMMIT!)
-# ============================================
+# misc
+.DS_Store
+**/.DS_Store
 .env
 .env.local
-.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
 .env.secrets
-.env.production
-.env.development
 **/.env.secrets
-# Note: .env.secrets.example should be committed as a template (remove from ignore if needed)
-# **/.env.secrets.example
-*.pem
-*.key
-credentials
-.aws/credentials
-secrets.json
-config.secrets.*
 
-# ============================================
-# PACKAGE MANAGER FILES
-# ============================================
-package-lock.json
-**/package-lock.json
-yarn.lock
-**/yarn.lock
-.pnp/
+# TypeScript incremental build cache (composite-project emit + tsc -b buildinfo).
+# Redirected into node_modules/.tsbuildcache/ via tsconfig tsBuildInfoFile/outDir,
+# this pattern is a backstop in case any tool ever writes one at a default path.
+*.tsbuildinfo
 
-# ============================================
-# LOGS & DEBUG FILES
-# ============================================
-*.log
+# AWS SAM build artifacts
+.aws-sam/
+**/.aws-sam/
+
+# Playwright MCP debug artifacts (console logs, page snapshots/screenshots)
+.playwright-mcp/
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
-*.log.*
 
-# ============================================
-# OS FILES
-# ============================================
-.DS_Store
-**/.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-Desktop.ini
-
-# ============================================
-# IDE & EDITOR FILES
-# ============================================
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.project
-.classpath
-.settings/
 .cursorignore
-
-# ============================================
-# TEST COVERAGE & REPORTS
-# ============================================
-coverage/
-**/coverage/
-.nyc_output/
-*.lcov
-test-results/
-junit.xml
-
-# ============================================
-# TEMPORARY & CACHE FILES
-# ============================================
-*.tmp
-*.temp
-.cache/
-.temp/
-*.cache
-*.tsbuildinfo
-.tsbuildinfo
-
-# ============================================
-# AWS SAM / CLOUDFORMATION
-# ============================================
-samconfig.toml
-**/samconfig.toml
-*.zip
-lambda-*.zip
-deployment-package.zip
-
-# ============================================
-# PYTHON (if using Python Lambda functions)
-# ============================================
-__pycache__/
-**/__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv
-
-# ============================================
-# VERCEL
-# ============================================
 .vercel
 **/.vercel
 
-# ============================================
-# DOCUMENTATION (Optional - uncomment if you don't want to commit these)
-# ============================================
+.vscode/
+.idea/
+
+# Documentation (optional - uncomment if you don't want to commit)
 # PROJECT_PLAN.md
 # DEVELOPMENT_RULES.md
 # AWS_FREE_TIER_SETUP_GUIDE.md
-# AWS_IAM_AND_MONITORING_*.md
-# REACT_QUERY_SETUP_GUIDE.md
-
-# ============================================
-# OLD API FILES (if deleting old code)
-# ============================================
-# Uncomment if you want to ignore old API directory
-# codebook/api/
-
-# ============================================
-# CONFIG FILES (if they contain secrets)
-# ============================================
-build.toml
-**/build.toml
-.yamllint
-**/.yamllint
-*.toml
-**/*.toml
-!package.json
-!**/package.json
+docs/COOLIFY_PUBLIC_BACKEND_GUIDE.md
+docs/DOCKER_VPS_BACKEND_PLAYBOOK.md
+docs/HETZNER_VPS_MIGRATION_GUIDE.md
+docs/SUBDOMAIN_ARNOBMAHMUD_SETUP.md
+docs/personal-dev-info.txt

@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Self-hosted Roboto (public/fonts/roboto/roboto-var.woff2) — served from our
+   own origin instead of fonts.googleapis.com, no third-party request at
+   runtime. Single variable-font file covers the full 300-700 weight range
+   actually used across the codebase (font-light/normal/medium/semibold). */
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/roboto/roboto-var.woff2") format("woff2-variations");
+}
+
+* {
+  font-family: "Roboto", sans-serif;
+}
+
+/* CTA shine sweep (docs/RIPPLE_BUTTON_EFFECT.md) — feathered gradient sweeping
+   left-to-right over primary CTA buttons wrapped in .cta-shine-wrap. */
+.cta-shine-wrap {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+.cta-shine-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 85%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 45%,
+    rgba(255, 255, 255, 0.35) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cta-shine-wrap::after {
+    animation: cta-shine 4.5s cubic-bezier(0.35, 0, 0.15, 1) infinite;
+  }
+}
+
+/* Hero rotating background (docs/HERO_ROTATING_BACKGROUND_SPEC.md) — two
+   full-bleed layers, crossfade via opacity transition, Ken Burns zoom on the
+   active layer only. */
+.hero-rotating-bg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+.hero-rotating-bg__layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transform-origin: center center;
+  transition: opacity 1.75s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hero-rotating-bg__layer--active {
+  opacity: 1;
+}
+@keyframes hero-bg-kenburns-cycle {
+  0% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.055) translate3d(0, -0.28%, 0);
+  }
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-rotating-bg__layer--active {
+    animation: hero-bg-kenburns-cycle 14s ease-in-out infinite;
+  }
+}

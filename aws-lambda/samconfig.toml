@@ -1,0 +1,15 @@
+# SAM Configuration File
+# This file stores deployment settings so you don't have to answer questions every time
+
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "codebook-lambda"  # Stack name in AWS CloudFormation
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM"  # Allow SAM to create IAM roles
+region = "eu-north-1"  # AWS region (must match DynamoDB region)
+confirm_changeset = true  # Ask for confirmation before deploying
+resolve_s3 = true  # Automatically create S3 bucket for deployment artifacts
+

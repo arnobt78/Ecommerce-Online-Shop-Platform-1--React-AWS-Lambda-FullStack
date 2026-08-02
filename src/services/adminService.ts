@@ -577,8 +577,9 @@ export async function getAiInsights(summary: string): Promise<AiInsightsResult> 
 }
 
 // REQ-1654 — on-demand consolidated stock digest (rollup instead of a ping
-// per order); admin-triggered rather than a scheduled job (adding a
-// scheduler would be new backend infra beyond this pass's scope).
+// per order). A real scheduled version of this same digest also now runs
+// daily via node-cron (REQ-1661, opt-in via SCHEDULE_JOBS_ENABLED) — this
+// button remains for an on-demand check outside that schedule.
 export interface LowStockDigestResult {
   message: string;
   lowStockCount: number;
@@ -592,6 +593,95 @@ export async function sendLowStockDigest(): Promise<LowStockDigestResult> {
   const response = await fetch(`${API_BASE_URL}/admin/notifications/low-stock-digest`, {
     method: "POST",
     headers: authHeaders(browserData.token),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response), response.status);
+  }
+
+  return response.json();
+}
+
+// REQ-1664 — on-demand AI product-description draft. Never auto-applied;
+// the admin reviews/edits in ProductForm and must still explicitly save.
+export interface ProductDescriptionInput {
+  name: string;
+  author?: string;
+  category?: string;
+  level?: string;
+  tags?: string[];
+}
+
+export interface ProductDescriptionResult {
+  overview: string;
+  long_description: string;
+  provider: string;
+}
+
+export async function generateProductDescription(input: ProductDescriptionInput): Promise<ProductDescriptionResult> {
+  const browserData = requireAdminSession();
+
+  const response = await fetch(`${API_BASE_URL}/admin/products/generate-description`, {
+    method: "POST",
+    headers: authHeaders(browserData.token),
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response), response.status);
+  }
+
+  return response.json();
+}
+
+// REQ-1662 — CSV import/export. Downloads trigger a real browser save (blob
+// + object URL), same pattern as downloadOrderInvoice (dataService.ts).
+async function downloadCsv(path: string, filenamePrefix: string): Promise<void> {
+  const browserData = requireAdminSession();
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${browserData.token}` },
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response), response.status);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filenamePrefix}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function exportProductsCsv(): Promise<void> {
+  return downloadCsv("/admin/products/export", "products-export");
+}
+
+export function exportOrdersCsv(): Promise<void> {
+  return downloadCsv("/admin/orders/export", "orders-export");
+}
+
+export interface ProductCsvImportResult {
+  created: number;
+  updated: number;
+  errors: Array<{ row: number; message: string }>;
+}
+
+// `csv` is the raw file text (read client-side via File.text()) — no
+// multipart/file-upload infra exists in this backend (images upload
+// client-side directly to Cloudinary), and a CSV is plain text anyway.
+export async function importProductsCsv(csv: string): Promise<ProductCsvImportResult> {
+  const browserData = requireAdminSession();
+
+  const response = await fetch(`${API_BASE_URL}/admin/products/import`, {
+    method: "POST",
+    headers: authHeaders(browserData.token),
+    body: JSON.stringify({ csv }),
   });
 
   if (!response.ok) {

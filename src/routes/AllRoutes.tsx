@@ -13,6 +13,7 @@ import {
   DashboardPage,
   PaymentSuccessPage,
   PaymentCancelPage,
+  GuestOrderLookupPage,
   CreateTicketPage,
   TicketsListPage,
   TicketDetailPage,
@@ -74,6 +75,12 @@ const AdminReviewDetailPage = lazy(() =>
 );
 const AdminSettingsPage = lazy(() =>
   import("../pages/Admin").then((m) => ({ default: m.AdminSettingsPage }))
+);
+const AdminCouponsPage = lazy(() =>
+  import("../pages/Admin").then((m) => ({ default: m.AdminCouponsPage }))
+);
+const AdminReturnsPage = lazy(() =>
+  import("../pages/Admin").then((m) => ({ default: m.AdminReturnsPage }))
 );
 
 // recharts/d3 (~370KB) is only used by these 4 chart components, themselves
@@ -143,20 +150,15 @@ export const AllRoutes = () => {
         />
         <Route
           path="payment-success"
-          element={
-            <ProtectedRoute>
-              <PaymentSuccessPage />
-            </ProtectedRoute>
-          }
+          // REQ-1659: not wrapped in ProtectedRoute — a guest checkout (no
+          // token) must be able to land here too. The page itself already
+          // safely branches on an authenticated user vs. the guest identity
+          // forwarded via navigation state; no change for logged-in users.
+          element={<PaymentSuccessPage />}
         />
-        <Route
-          path="payment-cancel"
-          element={
-            <ProtectedRoute>
-              <PaymentCancelPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="payment-cancel" element={<PaymentCancelPage />} />
+        {/* REQ-1659: public, no-auth guest order tracking */}
+        <Route path="orders/guest/lookup" element={<GuestOrderLookupPage />} />
 
         {/* Support Tickets Routes */}
         <Route
@@ -323,6 +325,22 @@ export const AllRoutes = () => {
           element={
             <ProtectedRoute requiredRole="admin">
               <AdminSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/coupons"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminCouponsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/returns"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminReturnsPage />
             </ProtectedRoute>
           }
         />

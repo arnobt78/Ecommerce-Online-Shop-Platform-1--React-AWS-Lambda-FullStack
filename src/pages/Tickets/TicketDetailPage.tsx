@@ -9,9 +9,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { FormEvent } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import { useTitle } from "../../hooks/useTitle";
-import { useTicket, useReplyToTicket, useUpdateTicketStatus, useUpdateTicketPriority } from "../../hooks/useTickets";
+import { useTicket, useReplyToTicket, useUpdateTicketStatus, useUpdateTicketPriority, useGenerateTicketReplyDraft } from "../../hooks/useTickets";
 import { useUser } from "../../hooks/useUser";
 import { AdminLayout, useAdminLayout } from "../../components/Layouts/Admin";
 import { formatDateLong } from "../../utils/formatDate";
@@ -64,6 +64,7 @@ const TicketDetailContent = () => {
   const replyMutation = useReplyToTicket();
   const updateStatusMutation = useUpdateTicketStatus();
   const updatePriorityMutation = useUpdateTicketPriority();
+  const generateReplyDraftMutation = useGenerateTicketReplyDraft(); // REQ-1666
 
   const handlePriorityChange = useCallback(
     (priority: TicketPriority) => {
@@ -329,7 +330,29 @@ const TicketDetailContent = () => {
             {/* Reply Form */}
             {ticket.status !== "closed" && ticket.status !== "resolved" && (
               <Card className="p-4 sm:p-6">
-                <h2 className="text-lg font-medium text-gray-700 dark:text-white mb-4">{isAdmin ? "Reply to Customer" : "Add Reply"}</h2>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-medium text-gray-700 dark:text-white">{isAdmin ? "Reply to Customer" : "Add Reply"}</h2>
+                  {/* REQ-1666 — AI reply draft, admin only, never auto-sent */}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        ticketId &&
+                        generateReplyDraftMutation.mutate(ticketId, {
+                          onSuccess: (result) => {
+                            setReplyMessage(result.draft);
+                            if (replyError) setReplyError("");
+                          },
+                        })
+                      }
+                      disabled={generateReplyDraftMutation.isPending}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/40"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+                      {generateReplyDraftMutation.isPending ? "Drafting..." : "Suggest Reply"}
+                    </button>
+                  )}
+                </div>
                 <form onSubmit={handleReply} className="space-y-4">
                   <div>
                     <FormLabel htmlFor="reply" required>

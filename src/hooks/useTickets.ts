@@ -8,7 +8,17 @@
  */
 
 import { useQuery, useMutation, useQueryClient, type UseQueryResult, type UseMutationResult } from "@tanstack/react-query";
-import { createTicket, getTickets, getTicket, replyToTicket, updateTicketStatus, updateTicketPriority, type CreateTicketInput } from "../services/ticketService";
+import {
+  createTicket,
+  getTickets,
+  getTicket,
+  replyToTicket,
+  updateTicketStatus,
+  updateTicketPriority,
+  generateTicketReplyDraft,
+  type CreateTicketInput,
+  type TicketReplyDraftResult,
+} from "../services/ticketService";
 import { toast } from "../lib/toast";
 import type { Ticket, TicketStatus, TicketPriority } from "../types";
 
@@ -132,6 +142,18 @@ export function useUpdateTicketPriority(): UseMutationResult<Ticket, Error, Upda
     },
     onError: (error) => {
       toast.error(error.message || "Failed to update ticket priority", { closeButton: true, position: "bottom-right" });
+    },
+  });
+}
+
+// REQ-1666 — no cache/invalidation needed: this is a draft the admin edits
+// before sending, never persisted state on its own (same pattern as
+// REQ-1651's sentiment check and REQ-1664's description generator).
+export function useGenerateTicketReplyDraft(): UseMutationResult<TicketReplyDraftResult, Error, string> {
+  return useMutation({
+    mutationFn: (ticketId: string) => generateTicketReplyDraft(ticketId),
+    onError: (error) => {
+      toast.error(error.message || "Failed to generate reply draft", { closeButton: true, position: "bottom-right" });
     },
   });
 }

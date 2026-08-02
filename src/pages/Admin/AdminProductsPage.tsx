@@ -12,15 +12,16 @@
  * - Real-time updates with cache invalidation
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import type { ChangeEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createColumnHelper } from "@tanstack/react-table";
-import { Plus, Eye, Pencil, Trash2, XCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, XCircle, AlertTriangle, CheckCircle2, Download, Upload } from "lucide-react";
 import { toast } from "../../lib/toast";
 import { useTitle } from "../../hooks/useTitle";
-import { useAllProducts, useDeleteProduct } from "../../hooks/useAdmin";
+import { useAllProducts, useDeleteProduct, useExportProductsCsv, useImportProductsCsv } from "../../hooks/useAdmin";
 import { AdminLayout, useAdminLayout } from "../../components/Layouts/Admin";
 import { getProductImageUrl, getProductImageKey } from "../../utils/productImage";
 import { formatPrice } from "../../utils/formatPrice";
@@ -64,6 +65,17 @@ const AdminProductsContent = () => {
   const queryClient = useQueryClient();
   const { data: products, isLoading, error } = useAllProducts();
   const deleteProductMutation = useDeleteProduct();
+  const exportCsvMutation = useExportProductsCsv();
+  const importCsvMutation = useImportProductsCsv();
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    const csvText = await file.text();
+    importCsvMutation.mutate(csvText);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [filterInStock, setFilterInStock] = useState("all"); // "all", "in_stock", "out_of_stock", "featured"
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -262,13 +274,35 @@ const AdminProductsContent = () => {
         description="Manage all products in your store"
         onToggleSidebar={toggleSidebar}
         actions={
-          <button
-            onClick={() => navigate("/admin/products/new")}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2} />
-            <span className="hidden sm:inline">Create Product</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* REQ-1662 — CSV export/import */}
+            <input ref={importFileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImportFileChange} />
+            <button
+              onClick={() => importFileInputRef.current?.click()}
+              disabled={importCsvMutation.isPending}
+              title="Import products from CSV"
+              className="flex items-center gap-2 px-3 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+            >
+              <Upload className="h-4 w-4" strokeWidth={2} />
+              <span className="hidden md:inline">{importCsvMutation.isPending ? "Importing..." : "Import CSV"}</span>
+            </button>
+            <button
+              onClick={() => exportCsvMutation.mutate()}
+              disabled={exportCsvMutation.isPending}
+              title="Export products to CSV"
+              className="flex items-center gap-2 px-3 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" strokeWidth={2} />
+              <span className="hidden md:inline">Export CSV</span>
+            </button>
+            <button
+              onClick={() => navigate("/admin/products/new")}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2} />
+              <span className="hidden sm:inline">Create Product</span>
+            </button>
+          </div>
         }
       />
 

@@ -8,6 +8,7 @@ export { OrderDetailPage } from "./Order/OrderDetailPage";
 export { DashboardPage } from "./Dashboard/DashboardPage";
 export { PaymentSuccessPage } from "./Payment/PaymentSuccessPage";
 export { PaymentCancelPage } from "./Payment/PaymentCancelPage";
+export { GuestOrderLookupPage } from "./Payment/GuestOrderLookupPage";
 
 export { Login } from "./Login";
 export { Register } from "./Register";

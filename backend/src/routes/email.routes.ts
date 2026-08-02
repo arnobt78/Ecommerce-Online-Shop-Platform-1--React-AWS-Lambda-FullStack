@@ -4,7 +4,7 @@ import express, { type Request, type Response } from "express";
 import { successResponse, errorResponse } from "../lib/response";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { emailTemplates, sendTemplatedEmail } from "../services/email.service";
-import { getAllProducts } from "../services/products.service";
+import { getStockDigestBreakdown } from "../services/products.service";
 
 const router = express.Router();
 // Matches the frontend's ADMIN_ALERT_EMAIL constant (src/services/emailService.ts) — the
@@ -47,11 +47,7 @@ router.post("/email/send", requireAuth, async (req: Request, res: Response) => {
 // /email/send above (which accepts any `to` from any authenticated user).
 router.post("/admin/notifications/low-stock-digest", requireAuth, requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const products = await getAllProducts();
-    const outOfStockProducts = products.filter((p) => p.stock === 0 || (p.stock == null && !p.in_stock)).map((p) => ({ id: p.id, name: p.name }));
-    const lowStockProducts = products
-      .filter((p) => p.stock != null && p.stock > 0 && p.stock <= (p.lowStockThreshold ?? 10))
-      .map((p) => ({ id: p.id, name: p.name, stock: p.stock as number, lowStockThreshold: p.lowStockThreshold ?? 10 }));
+    const { lowStockProducts, outOfStockProducts } = await getStockDigestBreakdown();
 
     const result = await sendTemplatedEmail(ADMIN_ALERT_EMAIL, "admin-low-stock-digest", { lowStockProducts, outOfStockProducts });
     return successResponse(res, { message: "Stock digest sent", lowStockCount: lowStockProducts.length, outOfStockCount: outOfStockProducts.length, ...result });

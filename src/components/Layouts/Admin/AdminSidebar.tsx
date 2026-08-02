@@ -22,6 +22,8 @@ import {
   Ticket,
   Star,
   Settings,
+  Tag,
+  Undo2,
   ArrowLeft,
   CircleUserRound,
   LogOut,
@@ -115,6 +117,8 @@ export const AdminSidebar = ({ isOpen, setIsOpen, onMenuClick: _onMenuClick }: A
     { path: "/admin/management-history", label: "History", icon: History },
     { path: "/admin/tickets", label: "Support Tickets", icon: Ticket },
     { path: "/admin/reviews", label: "Product Reviews", icon: Star },
+    { path: "/admin/coupons", label: "Coupons", icon: Tag },
+    { path: "/admin/returns", label: "Returns", icon: Undo2 },
     { path: "/admin/settings", label: "Settings", icon: Settings },
   ];
 

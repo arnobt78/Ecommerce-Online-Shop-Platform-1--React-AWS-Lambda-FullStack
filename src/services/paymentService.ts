@@ -41,12 +41,23 @@ export interface PaymentIntentResult {
   amount: number;
   currency: string;
   status: string;
+  // REQ-1659: the identity (real or synthetic guest id) this payment intent
+  // was created under — reused as-is by createOrder() below.
+  userId: string;
+  isGuest: boolean;
+  // REQ-1658: present only when a coupon was applied — the server's own
+  // recomputed discount, never a client-trusted figure.
+  couponCode?: string;
+  discountAmount?: number;
 }
 
-export async function createPaymentIntent(cartList: CartItem[]): Promise<PaymentIntentResult> {
+// REQ-1659: `guestEmail` enables checkout with no account at all — omit the
+// Authorization header entirely when there's no session token so the
+// backend's optionalAuth treats this as a guest request.
+export async function createPaymentIntent(cartList: CartItem[], couponCode?: string, guestEmail?: string): Promise<PaymentIntentResult> {
   const browserData = getSession();
 
-  if (!browserData.cbid) {
+  if (!browserData.cbid && !guestEmail) {
     throw new ApiError("User not authenticated", 401);
   }
 
@@ -56,14 +67,16 @@ export async function createPaymentIntent(cartList: CartItem[]): Promise<Payment
   const requestBody = {
     currency: "usd",
     cartList: cartList.map((item) => ({ id: item.id, quantity: item.quantity })),
+    ...(couponCode && { couponCode }),
+    ...(!browserData.token && guestEmail && { guestEmail }),
   };
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (browserData.token) headers.Authorization = `Bearer ${browserData.token}`;
 
   const response = await fetch(`${API_BASE_URL}/payment/create-intent`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${browserData.token}`,
-    },
+    headers,
     body: JSON.stringify(requestBody),
   });
 
@@ -84,17 +97,12 @@ export interface PaymentStatus {
 
 export async function verifyPaymentStatus(paymentIntentId: string): Promise<PaymentStatus> {
   const browserData = getSession();
-
-  if (!browserData.cbid) {
-    throw new ApiError("User not authenticated", 401);
-  }
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (browserData.token) headers.Authorization = `Bearer ${browserData.token}`;
 
   const response = await fetch(`${API_BASE_URL}/payment/verify/${paymentIntentId}`, {
     method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${browserData.token}`,
-    },
+    headers,
   });
 
   if (!response.ok) {

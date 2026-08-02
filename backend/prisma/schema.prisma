@@ -30,6 +30,8 @@ model User {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   addresses           Address[] // REQ-1618: address book
+  wishlist            Wishlist[] // REQ-1656
+  refreshTokens       RefreshToken[] // REQ-1667
 
   @@index([role])
 }
@@ -98,6 +100,8 @@ model Product {
   videoUrl          String? // optional book-trailer video URL, rendered by ProductVideo
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  wishlistedBy      Wishlist[] // REQ-1656
+  stockAlerts       StockAlert[] // REQ-1657
 
   @@index([featured_product])
 }
@@ -107,7 +111,14 @@ model Product {
 // DynamoDB item did, so the API response shape doesn't change for the frontend.
 model Order {
   id              String    @id @default(uuid())
+  // REQ-1659: guest checkout orders get a synthetic "guest_<uuid>" id here
+  // (never a real User.id) rather than making this column nullable — every
+  // existing `order.userId !== req.user.id` ownership check across the
+  // codebase keeps working unchanged (a guest order simply never matches any
+  // authenticated user), so this stays purely additive.
   userId          String
+  isGuest         Boolean   @default(false) // REQ-1659
+  guestEmail      String? // REQ-1659: set only when isGuest — used by the no-auth guest order-lookup route
   user            Json // { id, name, email } snapshot at order time
   cartList        Json // array of cart line items
   amount_paid     Float
@@ -129,6 +140,11 @@ model Order {
   refundId        String?
   refundAmount    Int?
   refundedAt      DateTime?
+  // REQ-1658: snapshot of the coupon applied at checkout (denormalized like
+  // `user` above — a coupon can later be edited/deactivated without altering
+  // the historical order record).
+  couponCode      String?
+  discountAmount  Int? // cents, matches refundAmount's unit
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -191,5 +207,92 @@ model Review {
   updatedAt    DateTime  @updatedAt
 
   @@index([productId])
+  @@index([userId])
+}
+
+// Parent: REQ-1656 — save-for-later. Unique pair prevents duplicate saves;
+// no `onDelete` cascade complications since both parents (User/Product) are
+// hard-deleted rarely and this is a pure convenience join table.
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
+
+// Parent: REQ-1657 — "Notify me" subscription for an out-of-stock product.
+// `email` (not just userId) so the same mechanism could later support a
+// non-authenticated notify-me form without a schema change; `notifiedAt` marks
+// a row as fulfilled instead of deleting it, giving a lightweight send history.
+model StockAlert {
+  id         String    @id @default(uuid())
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  email      String
+  userId     String? // set when the subscriber was logged in; null for a bare-email subscription
+  notifiedAt DateTime? // null = still pending; set once the restock email has been sent
+  createdAt  DateTime  @default(now())
+
+  @@unique([productId, email])
+  @@index([productId])
+}
+
+// Parent: REQ-1658 — checkout discount codes. `type`/`value` pair mirrors the
+// two common real-world discount shapes (percent-off, fixed-amount-off)
+// without needing a polymorphic table. Usage is enforced server-side only
+// (see coupons.service.ts) — never trust a client-computed discount amount.
+model Coupon {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  type           String // "percent" | "fixed"
+  value          Float // percent: 0-100, fixed: dollars
+  minOrderAmount Float? // dollars; order subtotal must meet this to apply
+  maxUses        Int? // null = unlimited
+  timesUsed      Int       @default(0)
+  expiresAt      DateTime?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// Parent: REQ-1663 — customer-initiated post-delivery return request, with
+// admin approve/reject. Approval reuses the existing refundOrderPayment()
+// Stripe flow from REQ-1639 rather than a parallel refund path.
+model ReturnRequest {
+  id           String    @id @default(uuid())
+  orderId      String
+  userId       String
+  reason       String
+  status       String    @default("requested") // requested | approved | rejected | refunded
+  adminNote    String?
+  refundId     String?
+  refundAmount Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([userId])
+}
+
+// Parent: REQ-1667 — enables a short-lived access token (see lib/auth.ts)
+// without forcing a re-login every few minutes. Only a hash of the token is
+// stored (never the raw value) so a DB leak alone can't be replayed; rotated
+// (old row revoked, new row issued) on every use to detect theft — a reused
+// revoked token signals the refresh chain was compromised.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
   @@index([userId])
 }

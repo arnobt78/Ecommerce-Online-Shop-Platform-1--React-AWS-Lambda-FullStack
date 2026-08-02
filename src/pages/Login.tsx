@@ -124,6 +124,12 @@ export const Login = () => {
               Create an account
             </Link>
           </p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+            Checked out as a guest?{" "}
+            <Link to="/orders/guest/lookup" className="text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 font-medium">
+              Track your order
+            </Link>
+          </p>
         </StaggerItem>
 
         <form onSubmit={handleLogin}>

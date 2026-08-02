@@ -5,8 +5,10 @@
 
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { randomBytes, createHash } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { errorResponse } from "./response";
+import { prisma } from "./prisma";
 import type { AuthUser } from "../types/auth";
 
 const INSECURE_DEFAULT_SECRETS = ["your-secret-key-change-in-production", "change-me-to-a-long-random-string"];
@@ -36,6 +38,15 @@ interface TokenSubject {
   role?: string | null;
 }
 
+// Parent: REQ-1667 — shortened from the original 7 days now that a refresh
+// token exists to silently renew it; a leaked/stolen access token is now
+// only usable for at most an hour instead of a full week. 1h (not something
+// much shorter like 15m) is deliberately generous for a demo/portfolio app
+// where a background refresh isn't wired into every single fetch call — see
+// useTokenRefresh.ts on the frontend for the renewal strategy.
+const ACCESS_TOKEN_EXPIRY = "1h";
+const REFRESH_TOKEN_EXPIRY_DAYS = 30;
+
 export function generateToken(user: TokenSubject): string {
   return jwt.sign(
     {
@@ -45,7 +56,7 @@ export function generateToken(user: TokenSubject): string {
       role: user.role || "user",
     },
     JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: ACCESS_TOKEN_EXPIRY }
   );
 }
 
@@ -55,6 +66,47 @@ export function verifyToken(token: string): AuthUser | null {
   } catch {
     return null;
   }
+}
+
+function hashRefreshToken(rawToken: string): string {
+  return createHash("sha256").update(rawToken).digest("hex");
+}
+
+// Parent: REQ-1667 — only the hash is ever persisted (never the raw token),
+// so a database leak alone can't be replayed as a valid refresh token.
+export async function generateRefreshToken(userId: string): Promise<string> {
+  const rawToken = randomBytes(48).toString("hex");
+  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+  await prisma.refreshToken.create({ data: { userId, tokenHash: hashRefreshToken(rawToken), expiresAt } });
+  return rawToken;
+}
+
+export interface RotatedRefreshToken {
+  userId: string;
+  rawToken: string;
+}
+
+// Parent: REQ-1667 — rotation: the presented token is revoked and a brand
+// new one issued on every successful use, never reused. A revoked token
+// being presented again is the signal that the refresh chain was
+// compromised (a copy of an already-used token replayed by an attacker).
+export async function rotateRefreshToken(presentedRawToken: string): Promise<RotatedRefreshToken | null> {
+  const tokenHash = hashRefreshToken(presentedRawToken);
+  const existing = await prisma.refreshToken.findUnique({ where: { tokenHash } });
+  if (!existing || existing.revokedAt || existing.expiresAt < new Date()) return null;
+
+  await prisma.refreshToken.update({ where: { id: existing.id }, data: { revokedAt: new Date() } });
+  const rawToken = await generateRefreshToken(existing.userId);
+  return { userId: existing.userId, rawToken };
+}
+
+// Parent: REQ-1667 — called on logout so a captured refresh token can't
+// silently keep minting new access tokens after the user explicitly signs out.
+export async function revokeRefreshToken(presentedRawToken: string): Promise<void> {
+  await prisma.refreshToken.updateMany({
+    where: { tokenHash: hashRefreshToken(presentedRawToken), revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -88,6 +140,19 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   if (!decoded) return errorResponse(res, "Unauthorized", 401);
 
   req.user = decoded;
+  next();
+}
+
+// Parent: REQ-1659 — guest checkout. Unlike requireAuth, a missing/invalid
+// token is not an error here: req.user is simply left undefined and the
+// route itself decides what to require (an authenticated user OR a guest
+// email). Never widen this to skip auth on a route that actually needs it.
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+  const token = extractToken(req);
+  if (token) {
+    const decoded = verifyToken(token);
+    if (decoded) req.user = decoded;
+  }
   next();
 }
 

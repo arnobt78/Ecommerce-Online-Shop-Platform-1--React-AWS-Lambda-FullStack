@@ -10,6 +10,8 @@ import type { CartItem } from "../types";
 
 interface CreatePaymentIntentVariables {
   cartList: CartItem[];
+  couponCode?: string;
+  guestEmail?: string; // REQ-1659
 }
 
 interface UseCreatePaymentIntentOptions {
@@ -21,7 +23,7 @@ export function useCreatePaymentIntent(
   options: UseCreatePaymentIntentOptions = {},
 ): UseMutationResult<PaymentIntentResult, Error, CreatePaymentIntentVariables> {
   return useMutation({
-    mutationFn: ({ cartList }: CreatePaymentIntentVariables) => createPaymentIntent(cartList),
+    mutationFn: ({ cartList, couponCode, guestEmail }: CreatePaymentIntentVariables) => createPaymentIntent(cartList, couponCode, guestEmail),
     retry: false, // Don't retry automatically - prevent hundreds of calls
     onSuccess: (data) => {
       options.onSuccess?.(data);

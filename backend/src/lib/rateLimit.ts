@@ -22,3 +22,25 @@ export const paymentLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many payment requests, please try again later" },
 });
+
+// REQ-1657 — bounds abuse of unauthenticated, email-collecting public
+// endpoints (e.g. back-in-stock subscribe) that take no password/credential
+// but could otherwise be used to spam arbitrary inboxes or flood the DB.
+export const publicWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later" },
+});
+
+// REQ-1660 — the Shippo tracking webhook is secret-path-gated rather than
+// signature-verified (Shippo doesn't sign Track webhooks); this rate limit
+// is defense in depth against brute-forcing that secret path segment.
+export const webhookLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many webhook requests" },
+});

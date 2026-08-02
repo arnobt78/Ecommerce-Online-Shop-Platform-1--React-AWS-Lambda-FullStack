@@ -20,4 +20,6 @@ export { AdminTicketsPage } from "./AdminTicketsPage";
 export { AdminReviewsPage } from "./AdminReviewsPage";
 export { AdminReviewDetailPage } from "./AdminReviewDetailPage";
 export { AdminSettingsPage } from "./AdminSettingsPage";
+export { AdminCouponsPage } from "./AdminCouponsPage";
+export { AdminReturnsPage } from "./AdminReturnsPage";
 

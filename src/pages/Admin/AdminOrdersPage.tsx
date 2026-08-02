@@ -17,10 +17,10 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createColumnHelper } from "@tanstack/react-table";
-import { Eye } from "lucide-react";
+import { Eye, Download } from "lucide-react";
 import { toast } from "../../lib/toast";
 import { useTitle } from "../../hooks/useTitle";
-import { useAllOrders, useUpdateOrderStatus, useAllUsers } from "../../hooks/useAdmin";
+import { useAllOrders, useUpdateOrderStatus, useAllUsers, useExportOrdersCsv } from "../../hooks/useAdmin";
 import { AdminLayout, useAdminLayout } from "../../components/Layouts/Admin";
 import { formatPrice } from "../../utils/formatPrice";
 import { calculateOrderRiskFlags } from "../../services/analyticsService";
@@ -82,6 +82,7 @@ const AdminOrdersContent = () => {
   const { data: orders, isLoading, error } = useAllOrders();
   const { data: users } = useAllUsers(); // Fetch all users to enrich order data
   const updateStatusMutation = useUpdateOrderStatus();
+  const exportCsvMutation = useExportOrdersCsv();
   const [orderPendingCancel, setOrderPendingCancel] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
@@ -333,7 +334,22 @@ const AdminOrdersContent = () => {
   return (
     <div className="space-y-6 w-full max-w-full">
       {/* Page Header */}
-      <PageHeader title="Orders Management" description="Manage all orders in your store" onToggleSidebar={toggleSidebar} />
+      <PageHeader
+        title="Orders Management"
+        description="Manage all orders in your store"
+        onToggleSidebar={toggleSidebar}
+        actions={
+          <button
+            onClick={() => exportCsvMutation.mutate()}
+            disabled={exportCsvMutation.isPending}
+            title="Export orders to CSV"
+            className="flex items-center gap-2 px-3 py-2 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" strokeWidth={2} />
+            <span className="hidden md:inline">Export CSV</span>
+          </button>
+        }
+      />
 
       {/* Loading State */}
       {isLoading && <LoadingState message="Loading orders..." />}

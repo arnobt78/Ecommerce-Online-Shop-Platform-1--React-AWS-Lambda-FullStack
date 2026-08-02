@@ -167,3 +167,133 @@ export async function analyzeReviewSentiment(rating: number, comment: string): P
 
   return { sentiment, flagged, reason, provider: result.provider };
 }
+
+// Parent: REQ-1664 — AI product-description generator. Same on-demand,
+// admin-click pattern as REQ-1651/1652: drafts copy for the admin to review/
+// edit in ProductForm, never auto-published — the admin must still explicitly
+// save the form, exactly like the suggested-pricing banner.
+const DESCRIPTION_SYSTEM_PROMPT =
+  "You are a marketing copywriter for an e-commerce ebook store. Given a book's metadata, reply with exactly " +
+  "two lines, nothing else, no markdown, no labels: " +
+  "Line 1: a punchy one-sentence overview (under 160 characters) suitable for a product card. " +
+  "Line 2: a longer, persuasive 3-4 sentence description suitable for the full product page, highlighting who " +
+  "the book is for and what the reader will gain. Do not invent specific facts (page counts, editions, awards) " +
+  "not given in the input.";
+
+export interface ProductDescriptionInput {
+  name: string;
+  author?: string | null;
+  category?: string | null;
+  level?: string | null;
+  tags?: string[];
+}
+
+export interface ProductDescriptionResult {
+  overview: string;
+  long_description: string;
+  provider: string;
+}
+
+export async function generateProductDescription(input: ProductDescriptionInput): Promise<ProductDescriptionResult> {
+  if (!isLlmConfigured()) {
+    throw new AiInsightsUnavailableError(
+      "AI description generation is not configured. Add at least one provider API key to the backend .env.",
+      "LLM_NOT_CONFIGURED"
+    );
+  }
+
+  const metadataLines = [
+    `Title: ${input.name}`,
+    input.author && `Author: ${input.author}`,
+    input.category && `Category: ${input.category}`,
+    input.level && `Level: ${input.level}`,
+    input.tags && input.tags.length > 0 && `Topics: ${input.tags.join(", ")}`,
+  ].filter(Boolean);
+
+  const result = await createChatCompletion(
+    [
+      { role: "system", content: DESCRIPTION_SYSTEM_PROMPT },
+      { role: "user", content: metadataLines.join("\n") },
+    ],
+    // 512 was too low in testing — reasoning-capable models (Gemini 2.5,
+    // gpt-oss, qwen) spend part of max_tokens on hidden reasoning before the
+    // visible answer, truncating the long_description line mid-sentence.
+    // Same root cause and fix as REQ-1613's getBusinessInsights() above.
+    { max_tokens: 1024, temperature: 0.7 }
+  );
+
+  if (!result.ok) {
+    if (result.kind === "rate_limit") {
+      throw new AiInsightsUnavailableError("All configured AI providers are rate-limited right now. Try again shortly.", "LLM_RATE_LIMIT");
+    }
+    throw new AiInsightsUnavailableError("AI description generation is temporarily unavailable — every configured provider failed.", "LLM_UPSTREAM");
+  }
+
+  const lines = result.text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return {
+    overview: lines[0] || result.text.trim(),
+    long_description: lines.slice(1).join(" ") || lines[0] || result.text.trim(),
+    provider: result.provider,
+  };
+}
+
+// Parent: REQ-1666 — AI-assisted support ticket reply draft. Same on-demand,
+// admin-click pattern as REQ-1651/1664: drafts a reply for the admin to
+// review/edit before sending, reusing the same multi-provider chain — never
+// auto-sent to the customer.
+const TICKET_REPLY_SYSTEM_PROMPT =
+  "You are a helpful, professional customer support agent for an e-commerce ebook store called CodeBook. " +
+  "Given a support ticket's subject, category, priority, and message history, draft a reply to the customer's " +
+  "most recent message. Reply with ONLY the draft reply text, nothing else — no greeting boilerplate like " +
+  "'Dear customer', no signature, no labels, no markdown. Be concise (2-4 sentences), empathetic, and specific " +
+  "to what the customer actually asked. If the ticket concerns a refund/order, do not promise a specific outcome " +
+  "(e.g. don't say 'your refund is approved') — only acknowledge and explain next steps, since only a human " +
+  "admin can actually take that action.";
+
+export interface TicketReplyDraftInput {
+  subject: string;
+  category: string;
+  priority: string;
+  messages: Array<{ message: string; senderRole: string }>;
+}
+
+export interface TicketReplyDraftResult {
+  draft: string;
+  provider: string;
+}
+
+export async function generateTicketReplyDraft(input: TicketReplyDraftInput): Promise<TicketReplyDraftResult> {
+  if (!isLlmConfigured()) {
+    throw new AiInsightsUnavailableError(
+      "AI reply drafting is not configured. Add at least one provider API key to the backend .env.",
+      "LLM_NOT_CONFIGURED"
+    );
+  }
+
+  const conversation = input.messages
+    .map((m) => `${m.senderRole === "admin" ? "Support Agent" : "Customer"}: ${m.message}`)
+    .join("\n\n");
+
+  const userContent = `Subject: ${input.subject}\nCategory: ${input.category}\nPriority: ${input.priority}\n\nConversation so far:\n${conversation}`;
+
+  const result = await createChatCompletion(
+    [
+      { role: "system", content: TICKET_REPLY_SYSTEM_PROMPT },
+      { role: "user", content: userContent },
+    ],
+    { max_tokens: 1024, temperature: 0.6 }
+  );
+
+  if (!result.ok) {
+    if (result.kind === "rate_limit") {
+      throw new AiInsightsUnavailableError("All configured AI providers are rate-limited right now. Try again shortly.", "LLM_RATE_LIMIT");
+    }
+    throw new AiInsightsUnavailableError("AI reply drafting is temporarily unavailable — every configured provider failed.", "LLM_UPSTREAM");
+  }
+
+  return { draft: result.text.trim(), provider: result.provider };
+}

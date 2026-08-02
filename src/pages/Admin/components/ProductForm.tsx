@@ -7,10 +7,10 @@
  */
 
 import { useState, useEffect, useMemo, type ChangeEvent, type FormEvent } from "react";
-import { Info, TrendingUp, TrendingDown } from "lucide-react";
+import { Info, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
 import { FormInput, FormLabel, FormTextarea, FormCheckbox, FormSelect, FormError, ImageUpload, RippleButton, BookCover } from "../../../components/ui";
 import { useImageUpload } from "../../../hooks/useImageUpload";
-import { useAllOrders } from "../../../hooks/useAdmin";
+import { useAllOrders, useGenerateProductDescription } from "../../../hooks/useAdmin";
 import { calculateSuggestedPrice } from "../../../services/analyticsService";
 import type { Product } from "../../../types";
 
@@ -81,6 +81,9 @@ export const ProductForm = ({ product = null, onSubmit, isLoading = false, featu
     if (!product) return null;
     return calculateSuggestedPrice(product, allOrdersForPricing);
   }, [product, allOrdersForPricing]);
+
+  // REQ-1664 — AI description draft, never auto-applied
+  const generateDescriptionMutation = useGenerateProductDescription();
 
   // Image upload hook
   const imageUploadMutation = useImageUpload({
@@ -512,6 +515,36 @@ export const ProductForm = ({ product = null, onSubmit, isLoading = false, featu
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Alert when stock falls below this number (default: 10)</p>
           <FormError message={errors.lowStockThreshold} />
         </div>
+      </div>
+
+      {/* REQ-1664 — AI description draft: fills Overview + Long Description below,
+          admin still reviews/edits and must explicitly Save (never auto-applied). */}
+      <div>
+        <button
+          type="button"
+          onClick={() =>
+            generateDescriptionMutation.mutate(
+              {
+                name: formData.name || "Untitled",
+                author: formData.author || undefined,
+                category: formData.category || undefined,
+                level: formData.level || undefined,
+                tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
+              },
+              {
+                onSuccess: (result) => {
+                  setFormData((prev) => ({ ...prev, overview: result.overview, long_description: result.long_description }));
+                },
+              },
+            )
+          }
+          disabled={generateDescriptionMutation.isPending || !formData.name.trim()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/40"
+        >
+          <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+          {generateDescriptionMutation.isPending ? "Generating..." : "Generate description with AI"}
+        </button>
+        {!formData.name.trim() && <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Enter a product name first.</p>}
       </div>
 
       {/* Overview Field */}

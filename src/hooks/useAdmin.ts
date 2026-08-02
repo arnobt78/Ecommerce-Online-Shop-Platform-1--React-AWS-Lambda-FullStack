@@ -23,12 +23,19 @@ import {
   getActivityLogs,
   getAiInsights,
   sendLowStockDigest,
+  exportProductsCsv,
+  exportOrdersCsv,
+  importProductsCsv,
+  generateProductDescription,
   type AdminStats,
   type GenerateLabelOptions,
   type OrderTrackingResult,
   type ActivityLogQueryOptions,
   type AiInsightsResult,
   type LowStockDigestResult,
+  type ProductCsvImportResult,
+  type ProductDescriptionInput,
+  type ProductDescriptionResult,
 } from "../services/adminService";
 import {
   sendShippingNotificationEmail,
@@ -480,6 +487,62 @@ export function useSendLowStockDigest(): UseMutationResult<LowStockDigestResult,
     },
     onError: (error) => {
       toast.error(error.message || "Failed to send stock digest", { closeButton: true, position: "bottom-right" });
+    },
+  });
+}
+
+// REQ-1664 — no cache/invalidation needed: this is a draft the admin edits
+// in the form, never persisted state on its own (same pattern as REQ-1651's
+// sentiment check and REQ-1652's pricing suggestion).
+export function useGenerateProductDescription(): UseMutationResult<ProductDescriptionResult, Error, ProductDescriptionInput> {
+  return useMutation({
+    mutationFn: (input: ProductDescriptionInput) => generateProductDescription(input),
+    onError: (error) => {
+      toast.error(error.message || "Failed to generate description", { closeButton: true, position: "bottom-right" });
+    },
+  });
+}
+
+// REQ-1662 — CSV export/import. Exports trigger a real file download (no
+// cache entry to invalidate); import mutates the product catalog so it
+// invalidates exactly like create/update/delete elsewhere in this file.
+export function useExportProductsCsv(): UseMutationResult<void, Error, void> {
+  return useMutation({
+    mutationFn: () => exportProductsCsv(),
+    onError: (error) => {
+      toast.error(error.message || "Failed to export products", { closeButton: true, position: "bottom-right" });
+    },
+  });
+}
+
+export function useExportOrdersCsv(): UseMutationResult<void, Error, void> {
+  return useMutation({
+    mutationFn: () => exportOrdersCsv(),
+    onError: (error) => {
+      toast.error(error.message || "Failed to export orders", { closeButton: true, position: "bottom-right" });
+    },
+  });
+}
+
+export function useImportProductsCsv(): UseMutationResult<ProductCsvImportResult, Error, string> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (csv: string) => importProductsCsv(csv),
+    onSuccess: (data) => {
+      invalidateAfterProductChange(queryClient);
+      if (data.errors.length === 0) {
+        toast.success(`Import complete: ${data.created} created, ${data.updated} updated`, { closeButton: true, position: "bottom-right" });
+      } else {
+        toast.warning(`Import finished with ${data.errors.length} row error(s): ${data.created} created, ${data.updated} updated`, {
+          closeButton: true,
+          position: "bottom-right",
+          autoClose: 8000,
+        });
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to import products", { closeButton: true, position: "bottom-right" });
     },
   });
 }

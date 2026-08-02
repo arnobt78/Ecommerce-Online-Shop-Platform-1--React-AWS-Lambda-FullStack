@@ -22,6 +22,11 @@ import emailRoutes from "./routes/email.routes";
 import aiInsightsRoutes from "./routes/aiInsights.routes";
 import addressesRoutes from "./routes/addresses.routes";
 import monitoringRoutes from "./routes/monitoring.routes";
+import wishlistRoutes from "./routes/wishlist.routes";
+import stockAlertRoutes from "./routes/stockAlert.routes";
+import * as couponsRoutes from "./routes/coupons.routes";
+import webhooksRoutes from "./routes/webhooks.routes";
+import * as returnsRoutes from "./routes/returns.routes";
 
 const app = express();
 
@@ -76,6 +81,13 @@ app.use(emailRoutes);
 app.use(aiInsightsRoutes);
 app.use(addressesRoutes);
 app.use(monitoringRoutes);
+app.use(wishlistRoutes);
+app.use(stockAlertRoutes);
+app.use(couponsRoutes.publicRouter);
+app.use(couponsRoutes.adminRouter);
+app.use(webhooksRoutes);
+app.use(returnsRoutes.publicRouter);
+app.use(returnsRoutes.adminRouter);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ message: "Not found" });

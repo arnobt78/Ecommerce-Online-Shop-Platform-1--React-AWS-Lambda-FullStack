@@ -53,6 +53,7 @@ export const AuthCallback = () => {
     }
 
     const token = hashParams.get("token");
+    const refreshToken = hashParams.get("refreshToken");
     const userJson = hashParams.get("user");
 
     if (!token || !userJson) {
@@ -67,8 +68,9 @@ export const AuthCallback = () => {
     try {
       const user: OAuthCallbackUser = JSON.parse(userJson);
 
-      // Same sessionStorage contract as authService.js login()/register().
+      // Same sessionStorage contract as authService.ts login()/register().
       sessionStorage.setItem("token", JSON.stringify(token));
+      if (refreshToken) sessionStorage.setItem("refreshToken", JSON.stringify(refreshToken)); // REQ-1667
       sessionStorage.setItem("cbid", JSON.stringify(user.id));
       if (user.email) sessionStorage.setItem("userEmail", user.email);
       if (user.name) sessionStorage.setItem("userName", user.name);

@@ -151,6 +151,35 @@ export async function updateTicketStatus(ticketId: string, status: string): Prom
   return response.json();
 }
 
+// REQ-1666 — on-demand AI reply draft, admin only. Never auto-sent; the
+// admin reviews/edits the returned text before submitting via replyToTicket.
+export interface TicketReplyDraftResult {
+  draft: string;
+  provider: string;
+}
+
+export async function generateTicketReplyDraft(ticketId: string): Promise<TicketReplyDraftResult> {
+  const token = getToken();
+
+  if (!token) {
+    throw new ApiError("User not authenticated", 401);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/generate-reply`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await extractErrorMessage(response), response.status);
+  }
+
+  return response.json();
+}
+
 export async function updateTicketPriority(ticketId: string, priority: TicketPriority): Promise<Ticket> {
   const token = getToken();
 

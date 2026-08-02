@@ -36,6 +36,9 @@ export interface EmailTemplateData {
   // REQ-1654 — daily low-stock/out-of-stock digest (rollup instead of a ping per order)
   lowStockProducts?: Array<{ id: string; name: string; stock: number; lowStockThreshold: number }>;
   outOfStockProducts?: Array<{ id: string; name: string }>;
+  // REQ-1661 — weekly scheduled sales-summary digest
+  summary?: string;
+  insights?: string[];
 }
 
 interface EmailContent {
@@ -251,6 +254,43 @@ export const emailTemplates: Record<string, (data: EmailTemplateData) => EmailCo
       bodyHtml: `<p>A refund has been processed:</p>${infoBox([row("Order ID", data.orderId || ""), row("Customer", data.customerName || "N/A"), row("Refund Amount", `$${((data.refundAmount || 0) / 100).toFixed(2)}`), row("Refund ID", data.refundId || "N/A")])}`,
     }),
   }),
+
+  // Parent: REQ-1661 — weekly scheduled digest (see lib/scheduler.ts +
+  // services/scheduledJobs.service.ts). `insights` is the same AI-narrative
+  // shape as the existing interactive Business Insights panel (REQ-1613);
+  // empty when the LLM chain isn't configured — the raw summary still ships.
+  "admin-weekly-summary": (data) => {
+    const insights = data.insights || [];
+    return {
+      subject: `Weekly Sales Summary [${generateUniqueId()}]`,
+      text: `${data.summary || ""}\n\n${insights.length ? "Recommendations:\n" + insights.map((i) => `- ${i}`).join("\n") : ""}`,
+      html: wrapEmail({
+        headerColor: "#2563eb",
+        headerTitle: "📊 Weekly Sales Summary",
+        bodyHtml:
+          `<p style="font-size:14px;color:#374151;">${data.summary || ""}</p>` +
+          (insights.length > 0
+            ? `<h3 style="margin:16px 0 8px;color:#2563eb;">Recommendations</h3><ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;">${insights.map((i) => `<li>${i}</li>`).join("")}</ul>`
+            : `<p style="font-size:13px;color:#6b7280;font-style:italic;">AI recommendations unavailable this week (no LLM provider configured).</p>`),
+      }),
+    };
+  },
+
+  // Parent: REQ-1657 — sent to every pending StockAlert subscriber once a
+  // product's stock goes from 0 to a positive number (see products.service.updateProduct).
+  "back-in-stock": (data) => {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const productUrl = `${frontendUrl}/products/${data.productId || ""}`;
+    return {
+      subject: `${data.productName || "An item on your wishlist"} is back in stock! [${generateUniqueId()}]`,
+      text: `${data.productName || "The product"} you wanted to be notified about is back in stock: ${productUrl}`,
+      html: wrapEmail({
+        headerColor: "#22c55e",
+        headerTitle: "🎉 Back in Stock",
+        bodyHtml: `<p>Good news — <strong>${data.productName || "an item you were watching"}</strong> is back in stock.</p><p style="margin:20px 0;text-align:center;"><a href="${productUrl}" style="background-color:#22c55e;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">View Product</a></p>`,
+      }),
+    };
+  },
 };
 
 interface EmailAttachment {

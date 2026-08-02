@@ -6,6 +6,7 @@
 import { z } from "zod";
 import type { Product } from "@prisma/client";
 import { prisma } from "../lib/prisma";
+import { notifyStockAlertSubscribers } from "./stockAlert.service";
 
 // Parent: REQ-1304 — validated at the route boundary before reaching the service.
 // `.passthrough()` intentionally not used: unknown fields are silently dropped,
@@ -47,7 +48,14 @@ export type CreateProductInput = z.infer<typeof createProductSchema>;
 export const updateProductSchema = createProductSchema.partial();
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 
-export async function getAllProducts(searchTerm = ""): Promise<Product[]> {
+// Parent: REQ-1665 — fuzzy/typo-tolerant search via Postgres' pg_trgm
+// extension (`similarity()`/`%` operator), so a misspelled search term
+// (e.g. "atomic habbits") still surfaces the right product instead of
+// returning nothing, which a plain `contains` can't do. Falls back to the
+// original exact-substring search if the extension isn't enabled on this
+// database (e.g. a fresh environment before it's been provisioned) — search
+// must never go fully broken over an optional ranking enhancement.
+async function getAllProductsPlainSearch(searchTerm: string): Promise<Product[]> {
   return prisma.product.findMany({
     where: searchTerm
       ? {
@@ -61,6 +69,27 @@ export async function getAllProducts(searchTerm = ""): Promise<Product[]> {
   });
 }
 
+export async function getAllProducts(searchTerm = ""): Promise<Product[]> {
+  if (!searchTerm.trim()) {
+    return prisma.product.findMany({ orderBy: { createdAt: "desc" } });
+  }
+
+  try {
+    return await prisma.$queryRaw<Product[]>`
+      SELECT * FROM "Product"
+      WHERE name % ${searchTerm}
+         OR overview % ${searchTerm}
+         OR name ILIKE ${"%" + searchTerm + "%"}
+         OR overview ILIKE ${"%" + searchTerm + "%"}
+      ORDER BY GREATEST(similarity(name, ${searchTerm}), similarity(coalesce(overview, ''), ${searchTerm})) DESC
+      LIMIT 100
+    `;
+  } catch (error) {
+    console.error("Fuzzy search failed (pg_trgm likely not enabled), falling back to exact-substring search:", error);
+    return getAllProductsPlainSearch(searchTerm);
+  }
+}
+
 export async function getProductById(id: string): Promise<Product | null> {
   return prisma.product.findUnique({ where: { id } });
 }
@@ -70,6 +99,24 @@ export async function getProductById(id: string): Promise<Product | null> {
 export async function getProductsByIds(ids: string[]): Promise<Product[]> {
   if (ids.length === 0) return [];
   return prisma.product.findMany({ where: { id: { in: ids } } });
+}
+
+// Parent: REQ-1654/1661 — shared by both the admin-triggered digest route
+// and the scheduled daily digest job so the low/out-of-stock computation
+// itself lives in exactly one place; each caller decides independently
+// whether an empty result should still send an email.
+export interface StockDigestBreakdown {
+  lowStockProducts: Array<{ id: string; name: string; stock: number; lowStockThreshold: number }>;
+  outOfStockProducts: Array<{ id: string; name: string }>;
+}
+
+export async function getStockDigestBreakdown(): Promise<StockDigestBreakdown> {
+  const products = await getAllProducts();
+  const outOfStockProducts = products.filter((p) => p.stock === 0 || (p.stock == null && !p.in_stock)).map((p) => ({ id: p.id, name: p.name }));
+  const lowStockProducts = products
+    .filter((p) => p.stock != null && p.stock > 0 && p.stock <= (p.lowStockThreshold ?? 10))
+    .map((p) => ({ id: p.id, name: p.name, stock: p.stock as number, lowStockThreshold: p.lowStockThreshold ?? 10 }));
+  return { lowStockProducts, outOfStockProducts };
 }
 
 export async function getFeaturedProductsCount(): Promise<number> {
@@ -229,7 +276,19 @@ export async function updateProduct(
     throw new Error("No valid fields to update");
   }
 
-  return prisma.product.update({ where: { id }, data });
+  const updated = await prisma.product.update({ where: { id }, data });
+
+  // REQ-1657: fire back-in-stock emails on a 0 -> positive stock transition.
+  // Fire-and-forget (not awaited into the response) so a slow email send
+  // never delays the admin's product-save confirmation.
+  const wentBackInStock = (currentProduct.stock ?? 0) <= 0 && (updated.stock ?? 0) > 0;
+  if (wentBackInStock) {
+    notifyStockAlertSubscribers(id, updated.name).catch((error) => {
+      console.error(`Failed to send back-in-stock notifications for product ${id}:`, error);
+    });
+  }
+
+  return updated;
 }
 
 export async function deleteProduct(id: string): Promise<true> {
@@ -307,8 +366,18 @@ export async function incrementProductStock(productId: string, quantity: number)
   const newStock = currentStock + incrementAmount;
   const newInStock = newStock > 0;
 
-  return prisma.product.update({
+  const updated = await prisma.product.update({
     where: { id: productId },
     data: { stock: newStock, in_stock: newInStock },
   });
+
+  // REQ-1657: an order cancellation/refund restoring stock from 0 is just as
+  // real a "back in stock" moment as an admin manually editing the quantity.
+  if (currentStock <= 0 && newStock > 0) {
+    notifyStockAlertSubscribers(productId, updated.name).catch((error) => {
+      console.error(`Failed to send back-in-stock notifications for product ${productId}:`, error);
+    });
+  }
+
+  return updated;
 }

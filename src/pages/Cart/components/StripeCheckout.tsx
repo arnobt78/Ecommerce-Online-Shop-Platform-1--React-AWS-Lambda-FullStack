@@ -322,6 +322,7 @@ function CheckoutForm({ onSuccess, onCancel }: CheckoutFormProps) {
 
 interface StripeCheckoutProps {
   setCheckout: Dispatch<SetStateAction<boolean>>;
+  couponCode?: string; // REQ-1658 — re-validated and re-priced server-side, never trusted as-is
 }
 
 /**
@@ -330,7 +331,7 @@ interface StripeCheckoutProps {
  * Uses React Query for payment intent creation with proper caching
  * @param {Function} setCheckout - Function to close checkout modal
  */
-export const StripeCheckout = ({ setCheckout }: StripeCheckoutProps) => {
+export const StripeCheckout = ({ setCheckout, couponCode }: StripeCheckoutProps) => {
   const { cartList, total } = useCart();
   const navigate = useNavigate();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -340,6 +341,15 @@ export const StripeCheckout = ({ setCheckout }: StripeCheckoutProps) => {
     isLoading: userLoading,
   } = useUser();
   const paymentIntentCreatedRef = useRef(false); // Track if payment intent was created
+
+  // REQ-1659: guest checkout — a shopper with no account can proceed by
+  // supplying just an email instead of being hard-blocked with "please log
+  // in". No generic modal/input-dialog component exists in this codebase, so
+  // this renders as a small inline gate inside the same overlay (same
+  // reasoning as ProductDetail's "Notify me" email capture).
+  const hasToken = typeof window !== "undefined" && !!sessionStorage.getItem("token");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestConfirmed, setGuestConfirmed] = useState(false);
 
   // REQ-1620: optional saved-address selection — never blocks checkout (this
   // storefront delivers digital downloads; a shipping address only feeds the
@@ -368,11 +378,13 @@ export const StripeCheckout = ({ setCheckout }: StripeCheckoutProps) => {
         setClientSecret(data.clientSecret);
         paymentIntentCreatedRef.current = true;
 
-        // Send payment processing email to customer (async, don't block)
-        if (user?.email && user?.id) {
+        // Send payment processing email to customer (async, don't block) —
+        // REQ-1659: falls back to the guest email when there's no account.
+        const notifyEmail = user?.email || guestEmail;
+        if (notifyEmail) {
           sendPaymentProcessingEmail({
-            customerEmail: user.email,
-            customerName: user.name || "Customer",
+            customerEmail: notifyEmail,
+            customerName: user?.name || "Customer",
             orderId: data?.paymentIntentId || "pending",
             amount: total,
           }).catch((emailError) => {
@@ -397,10 +409,11 @@ export const StripeCheckout = ({ setCheckout }: StripeCheckoutProps) => {
       paymentIntentCreatedRef.current = false;
 
       // Send payment failed email to customer (async, don't block)
-      if (user?.email && user?.id) {
+      const failedNotifyEmail = user?.email || guestEmail;
+      if (failedNotifyEmail) {
         sendPaymentFailedEmail({
-          customerEmail: user.email,
-          customerName: user.name || "Customer",
+          customerEmail: failedNotifyEmail,
+          customerName: user?.name || "Customer",
           orderId: "pending",
           amount: total,
         }).catch((emailError) => {
@@ -460,13 +473,10 @@ export const StripeCheckout = ({ setCheckout }: StripeCheckoutProps) => {
       return;
     }
 
-    // Validate user is logged in
-    if (!userRef.current.id || !userRef.current.email) {
-      toast.error("Please log in to continue", {
-        closeButton: true,
-        position: "bottom-right",
-      });
-      setCheckout(false);
+    // REQ-1659: proceed if either logged in OR the guest-email gate below
+    // has been confirmed; otherwise wait — the render path shows the gate
+    // instead of erroring out, so just return without closing the modal.
+    if (!userRef.current.id && !guestConfirmed) {
       return;
     }
 
@@ -492,19 +502,27 @@ export const StripeCheckout = ({ setCheckout }: StripeCheckoutProps) => {
     paymentIntentCreatedRef.current = true; // Mark as attempted immediately
     createPaymentIntentMutation.mutate({
       cartList: cartListRef.current,
+      couponCode,
+      guestEmail: !userRef.current.id ? guestEmail : undefined,
     });
     // Note: createPaymentIntentMutation and setCheckout are stable (from React Query and useState),
     // so including them in dependencies won't cause unnecessary re-runs
-  }, [userLoading, createPaymentIntentMutation, setCheckout]);
+  }, [userLoading, createPaymentIntentMutation, setCheckout, couponCode, guestConfirmed, guestEmail]);
 
   const handlePaymentSuccess = (paymentIntent: PaymentIntent) => {
     const selectedAddress = addresses.find((a) => a.id === selectedAddressIdRef.current);
 
-    // Navigate to success page with payment intent ID
+    // Navigate to success page with payment intent ID. REQ-1659: for a guest
+    // checkout, forward the synthetic userId/email minted at create-intent
+    // time — PaymentSuccessPage has no session to read these from otherwise.
     navigate("/payment-success", {
       state: {
         paymentIntentId: paymentIntent.id,
         amount: paymentIntent.amount / 100,
+        ...(!user?.id && {
+          guestUserId: createPaymentIntentMutation.data?.userId,
+          guestEmail,
+        }),
         ...(selectedAddress && {
           shippingAddress: {
             label: selectedAddress.label,
@@ -572,6 +590,60 @@ export const StripeCheckout = ({ setCheckout }: StripeCheckoutProps) => {
                 onClick: () => setCheckout(false),
               }}
             />
+          </Card>
+        </div>
+      </section>
+    );
+  }
+
+  // REQ-1659 — guest checkout gate: shown instead of "please log in" when
+  // there's no session at all. Renders before the loading spinner so a
+  // guest doesn't get stuck on an infinite "Loading..." state.
+  if (!userLoading && !hasToken && !guestConfirmed) {
+    return (
+      <section>
+        <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 z-40" onClick={handleCancel}></div>
+        <div className="fixed top-0 right-0 left-0 z-50 w-full md:inset-0 h-full flex justify-center items-center p-4">
+          <Card className="p-8 max-w-md w-full">
+            <PageHeader title="Checkout" description="Sign in or continue as a guest" />
+            <div className="mt-4 space-y-4">
+              <div>
+                <label htmlFor="guest-email" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Email address
+                </label>
+                <input
+                  id="guest-email"
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">We'll send your order confirmation here.</p>
+              </div>
+              <RippleButton
+                type="button"
+                onClick={() => guestEmail.trim() && setGuestConfirmed(true)}
+                disabled={!guestEmail.trim()}
+                className="w-full rounded-lg bg-blue-700 px-4 py-3 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
+              >
+                Continue as Guest
+              </RippleButton>
+              <div className="relative text-center text-xs text-gray-400 dark:text-gray-500">
+                <span className="bg-white dark:bg-gray-800 px-2 relative z-10">or</span>
+                <div className="absolute inset-x-0 top-1/2 border-t border-gray-200 dark:border-gray-700"></div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/login", { state: { from: "/cart" } })}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Log In
+              </button>
+              <button type="button" onClick={handleCancel} className="w-full text-center text-xs text-gray-400 hover:underline dark:text-gray-500">
+                Cancel
+              </button>
+            </div>
           </Card>
         </div>
       </section>
@@ -717,11 +789,19 @@ export const StripeCheckout = ({ setCheckout }: StripeCheckoutProps) => {
                 })}
               </div>
 
-              {/* Total */}
+              {/* REQ-1658 — discount row, shown once the server has confirmed the coupon */}
+              {!!createPaymentIntentMutation.data?.discountAmount && (
+                <div className="flex justify-between text-sm text-green-700 dark:text-green-400 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <span>Discount ({createPaymentIntentMutation.data.couponCode})</span>
+                  <span>-{formatPrice((createPaymentIntentMutation.data.discountAmount || 0) / 100)}</span>
+                </div>
+              )}
+
+              {/* Total — reflects the server-recomputed (and discounted) charge once available */}
               <div className="flex justify-between font-medium text-lg pt-2 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-gray-700 dark:text-white">Total</span>
                 <span className="text-gray-700 dark:text-white">
-                  {formatPrice(total)}
+                  {formatPrice(createPaymentIntentMutation.data ? createPaymentIntentMutation.data.amount / 100 : total)}
                 </span>
               </div>
             </div>

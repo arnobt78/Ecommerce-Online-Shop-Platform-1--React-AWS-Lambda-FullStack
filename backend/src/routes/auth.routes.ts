@@ -3,7 +3,7 @@
 import express, { type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { successResponse, errorResponse } from "../lib/response";
-import { generateToken } from "../lib/auth";
+import { generateToken, generateRefreshToken, rotateRefreshToken, revokeRefreshToken } from "../lib/auth";
 import { authLimiter } from "../lib/rateLimit";
 import { getGoogleAuthUrl, exchangeCodeForTokens, getGoogleUserInfo } from "../lib/googleOAuth";
 import * as usersService from "../services/users.service";
@@ -35,7 +35,8 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
     }
 
     const accessToken = generateToken(user);
-    return successResponse(res, { accessToken, user });
+    const refreshToken = await generateRefreshToken(user.id);
+    return successResponse(res, { accessToken, refreshToken, user });
   } catch (error) {
     console.error("Login error:", error);
     return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
@@ -52,7 +53,8 @@ router.post("/register", authLimiter, async (req: Request, res: Response) => {
 
     const user = await usersService.createUser(parsed.data);
     const accessToken = generateToken(user);
-    return successResponse(res, { accessToken, user });
+    const refreshToken = await generateRefreshToken(user.id);
+    return successResponse(res, { accessToken, refreshToken, user });
   } catch (error) {
     console.error("Register error:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
@@ -91,7 +93,8 @@ router.post("/auth/demo-login", authLimiter, async (req: Request, res: Response)
     }
 
     const accessToken = generateToken(user);
-    return successResponse(res, { accessToken, user });
+    const refreshToken = await generateRefreshToken(user.id);
+    return successResponse(res, { accessToken, refreshToken, user });
   } catch (error) {
     console.error("Demo login error:", error);
     return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
@@ -142,15 +145,65 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
 
     const user = await usersService.findOrCreateGoogleUser(profile);
     const accessToken = generateToken(user);
+    const refreshToken = await generateRefreshToken(user.id);
 
-    // Token travels via URL fragment (#) rather than query string so it never
-    // hits server logs / the browser's Referer header on the frontend route.
+    // Tokens travel via URL fragment (#) rather than query string so they
+    // never hit server logs / the browser's Referer header on the frontend route.
     return res.redirect(
-      `${frontendUrl}/auth/callback#token=${encodeURIComponent(accessToken)}&user=${encodeURIComponent(JSON.stringify(user))}`
+      `${frontendUrl}/auth/callback#token=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(refreshToken)}&user=${encodeURIComponent(JSON.stringify(user))}`
     );
   } catch (error) {
     console.error("Google OAuth callback error:", error);
     return res.redirect(`${frontendUrl}/auth/callback?error=oauth_failed`);
+  }
+});
+
+// POST /auth/refresh — REQ-1667. Exchanges a still-valid refresh token for a
+// new short-lived access token, rotating the refresh token in the same call
+// (the old one is revoked, a new one issued) so a stolen-and-replayed old
+// token is detectable. Rate-limited like the other credential-adjacent auth
+// routes even though a refresh token isn't a password — it's still a bearer
+// credential worth throttling guesses against.
+router.post("/auth/refresh", authLimiter, async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = (req.body || {}) as { refreshToken?: unknown };
+    if (!refreshToken || typeof refreshToken !== "string") {
+      return errorResponse(res, "refreshToken is required", 400);
+    }
+
+    const rotated = await rotateRefreshToken(refreshToken);
+    if (!rotated) {
+      return errorResponse(res, "Invalid or expired refresh token", 401);
+    }
+
+    const user = await usersService.getUserById(rotated.userId);
+    if (!user) {
+      return errorResponse(res, "Invalid or expired refresh token", 401);
+    }
+
+    const accessToken = generateToken(user);
+    return successResponse(res, { accessToken, refreshToken: rotated.rawToken, user });
+  } catch (error) {
+    console.error("Refresh token error:", error);
+    return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
+  }
+});
+
+// POST /auth/logout — REQ-1667. Best-effort server-side revocation so a
+// captured refresh token can't keep minting new access tokens after the
+// user explicitly signs out. No auth required — the refresh token itself is
+// the credential being revoked, and a missing/already-invalid token is a
+// harmless no-op (the client clears its own local session regardless).
+router.post("/auth/logout", async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = (req.body || {}) as { refreshToken?: unknown };
+    if (refreshToken && typeof refreshToken === "string") {
+      await revokeRefreshToken(refreshToken);
+    }
+    return successResponse(res, { message: "Logged out" });
+  } catch (error) {
+    console.error("Logout error:", error);
+    return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
   }
 });
 

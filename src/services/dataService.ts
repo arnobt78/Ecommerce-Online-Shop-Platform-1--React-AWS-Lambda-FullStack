@@ -199,7 +199,11 @@ export async function createOrder(
 ): Promise<OrderWithStockMeta> {
   const browserData = getSession();
 
-  if (!browserData.cbid) {
+  // REQ-1659: a guest checkout has no session at all — the caller (guest
+  // flow in PaymentSuccessPage) always supplies an explicit user.id (the
+  // synthetic id minted by create-intent) in that case, so only require a
+  // real session when the caller didn't already provide one.
+  if (!browserData.cbid && !user.id) {
     throw new ApiError("User not authenticated", 401);
   }
 
@@ -215,7 +219,8 @@ export async function createOrder(
   const orderUser: OrderUserSnapshot = {
     name: user.name ?? undefined,
     email: user.email,
-    id: user.id || browserData.cbid,
+    // Guaranteed non-null by the guard above (user.id or browserData.cbid).
+    id: (user.id || browserData.cbid)!,
   };
 
   const order = {
@@ -230,12 +235,12 @@ export async function createOrder(
     ...(shippingAddress && { shippingAddress }),
   };
 
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (browserData.token) headers.Authorization = `Bearer ${browserData.token}`;
+
   const requestOptions: RequestInit = {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${browserData.token}`,
-    },
+    headers,
     body: JSON.stringify(order),
   };
 

@@ -7,7 +7,7 @@
  * Implements proper caching with Infinity staleTime for payment status.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "../../lib/toast";
@@ -30,19 +30,30 @@ interface CreateOrderVariables {
 }
 
 export const PaymentSuccessPage = () => {
-  const location = useLocation() as { state?: { paymentIntentId?: string; shippingAddress?: OrderShippingAddress } };
+  const location = useLocation() as {
+    state?: { paymentIntentId?: string; shippingAddress?: OrderShippingAddress; guestUserId?: string; guestEmail?: string };
+  };
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { cartList, total, clearCart } = useCart();
   const { data: user, error: userError } = useUser();
 
+  // REQ-1659: a guest checkout has no session — StripeCheckout forwards the
+  // synthetic userId/email it got back from create-intent via navigation
+  // state instead. Everything below treats this identically to a real user.
+  const isGuestCheckout = !user?.id && !!location.state?.guestUserId;
+  const effectiveUser = useMemo(
+    () => (user?.id ? user : isGuestCheckout ? { id: location.state?.guestUserId, email: location.state?.guestEmail, name: "Guest" } : undefined),
+    [user, isGuestCheckout, location.state?.guestUserId, location.state?.guestEmail],
+  );
+
   const orderCreatedRef = useRef(false); // Use ref to track order creation without triggering re-renders
 
   // Get payment intent ID from URL params or location state
   const paymentIntentId = searchParams.get("payment_intent") || location.state?.paymentIntentId || searchParams.get("payment_intent_client_secret")?.split("_secret")[0];
 
-  const { data: paymentData, isLoading: paymentLoading, error: paymentError } = usePaymentStatus(paymentIntentId, !!paymentIntentId && !!user?.id);
+  const { data: paymentData, isLoading: paymentLoading, error: paymentError } = usePaymentStatus(paymentIntentId, !!paymentIntentId && (!!user?.id || isGuestCheckout));
 
   // Use refs to capture values without triggering re-runs of the create-order effect
   const cartListRef = useRef(cartList);
@@ -60,9 +71,11 @@ export const PaymentSuccessPage = () => {
     onSuccess: (orderData: OrderWithStockMeta) => {
       orderCreatedRef.current = true;
       clearCart();
-      const userId = user?.id;
+      const userId = effectiveUser?.id;
 
-      // Invalidate all relevant queries to ensure UI updates immediately
+      // Invalidate all relevant queries to ensure UI updates immediately.
+      // A guest has no admin-facing queries to invalidate (no account), but
+      // invalidateAfterOrderCreation still safely no-ops the user-scoped ones.
       invalidateAfterOrderCreation(queryClient, userId ?? null);
 
       // Explicitly refetch admin products to ensure stock updates are visible
@@ -72,8 +85,8 @@ export const PaymentSuccessPage = () => {
 
       // Send order confirmation email to customer (async, don't block)
       sendOrderConfirmationEmail({
-        customerEmail: user?.email ?? "",
-        customerName: user?.name ?? undefined,
+        customerEmail: effectiveUser?.email ?? "",
+        customerName: effectiveUser?.name ?? undefined,
         orderId: orderData.id,
         items: cartListRef.current.map((item) => ({
           id: item.id,
@@ -93,8 +106,8 @@ export const PaymentSuccessPage = () => {
 
       sendAdminNewOrderEmail({
         orderId: orderData.id,
-        customerName: user?.name ?? undefined,
-        customerEmail: user?.email,
+        customerName: effectiveUser?.name ?? undefined,
+        customerEmail: effectiveUser?.email,
         total: totalRef.current,
         itemCount: cartListRef.current.length,
         totalQuantity,
@@ -140,13 +153,13 @@ export const PaymentSuccessPage = () => {
     // Don't create if mutation is already in progress
     if (createOrderMutation.isPending) return;
 
-    if (paymentData && paymentData.status === "succeeded" && cartListRef.current.length > 0 && user?.id) {
+    if (paymentData && paymentData.status === "succeeded" && cartListRef.current.length > 0 && effectiveUser?.id) {
       // Mark as attempted immediately to prevent duplicate calls
       orderCreatedRef.current = true;
       createOrderMutation.mutate({
         cartList: cartListRef.current,
         total: totalRef.current,
-        user,
+        user: effectiveUser,
         paymentInfo: {
           paymentIntentId: paymentData.paymentIntentId,
           paymentStatus: "paid",
@@ -154,7 +167,7 @@ export const PaymentSuccessPage = () => {
         shippingAddress: shippingAddressRef.current,
       });
     }
-  }, [paymentData, user?.id, createOrderMutation, user]);
+  }, [paymentData, effectiveUser, createOrderMutation]);
 
   // Handle loading and error states
   if (!paymentIntentId) {

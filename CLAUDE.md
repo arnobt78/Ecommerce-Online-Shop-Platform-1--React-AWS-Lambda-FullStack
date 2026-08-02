@@ -26,17 +26,21 @@ eBook storefront + admin: catalog, cart, Stripe, addresses, orders, reviews, tic
 - Templates: `.env.example`, `backend/.env.example`
 
 ## Gotchas
-- Rolldown may flatten trivial `React.lazy()` facades — keep admin lazy at `AllRoutes` depth
-- Don’t `npm audit fix` react-router (pin `^7.18.2`)
-- Bump `package.json` version on Query response shape changes (`__APP_VERSION__` cache buster)
-- Keep both `.env.example` files synced with real env reads
-- Schema changes: this project uses `prisma db push`, not `prisma migrate` (no migrations folder) — never offer `migrate dev`'s DB reset
-- Book-cover art (`Product.coverColor`): never assign white/near-white (luminance check, threshold ~230/255) — hides `BookCoverSvg`'s white spine-curl lines
-- `ProductReel` auto-scrolls via `requestAnimationFrame` + direct `transform`, not `scrollBy`/interval — keep it that way for smooth continuous motion, not discrete jumps
-- `Order.paymentIntentId` is `@unique` (nullable-safe) — order creation is idempotent by design; never remove this constraint
-- Stripe's refund `reason` param is a fixed 3-value enum (`duplicate`/`fraudulent`/`requested_by_customer`), NOT free text — admin-entered cancel/refund reasons are audit-log notes only, see `toStripeRefundReason()` in `orders.routes.ts`
-- "AI-driven" admin features (restock/fraud/pricing/churn) are deterministic math, not LLM calls — only review-sentiment and the existing AI Insights panel actually call the LLM chain
-- `POST /email/send` restricts non-admin callers' `to` to their own email or the fixed admin alert address (was an open relay) — admins exempt
+- Rolldown may flatten trivial `React.lazy()` — keep admin lazy at `AllRoutes` depth
+- Don't `npm audit fix` react-router (pin `^7.18.2`); bump `package.json` version on Query response shape changes (`__APP_VERSION__` cache buster)
+- `prisma db push` only, no migrations folder — never `migrate dev`; keep both `.env.example` synced with real env reads
+- `Product.coverColor` never white/near-white (luminance <230/255, hides `BookCoverSvg` spine-curl); `ProductReel` auto-scrolls via rAF+`transform`, not `scrollBy`/interval
+- `Order.paymentIntentId` is `@unique` = idempotency — never remove
+- Stripe refund `reason` is a fixed 3-value enum — always via `toStripeRefundReason()`/`refundOrderPayment()` in `orders.service.ts` (shared by cancel-refund, refund, return/RMA approval)
+- "AI-driven" restock/fraud/pricing/churn = deterministic math; only review-sentiment, AI Insights, description generator, ticket-reply drafts call the LLM chain (`max_tokens` must stay ≥1024, reasoning models eat the budget)
+- `POST /email/send` restricts non-admin `to` to self or the admin alert address (was an open relay)
+- Access token 1h + rotating `RefreshToken` (hash-only stored), proactively renewed by `useTokenRefresh.ts` — don't retrofit a 401-retry interceptor into raw-fetch services
+- Guest checkout = synthetic `guest_<uuid>` id (`Order.userId` stays non-nullable, ownership checks unmodified); guests fetch via `GET /orders/guest/:orderId?email=`
+- Fuzzy search needs Postgres `pg_trgm` (`CREATE EXTENSION IF NOT EXISTS pg_trgm;`) — falls back to substring search if missing
+- Scheduled jobs (low-stock digest, weekly AI summary) opt-in via `SCHEDULE_JOBS_ENABLED=true` (default off)
+- CSV: products import+export, orders export-only (bulk order-create would bypass Stripe/stock/idempotency)
+- Webhook/shared-secret comparisons use `timingSafeEqual` (see `webhooks.routes.ts`); unauthenticated email-collecting POSTs go through `publicWriteLimiter`
+- Every service file gets re-exported from `src/services/index.ts` (barrel), even though hooks import it directly — keeps it discoverable
 
 ## Status (2026-08-02)
-C1 Phases 1–8 done + audited (REQ-1200…1655). Catalog: 17 books (university-library merge). Book-cover art/trailer video/recommendations reel + admin catalog insights, live cover-preview editor, `ProductDetail` redesigned. Phase 8: payment-tampering fix, auto-refund-on-cancel, invoice download, order idempotency, payment/order rate limiting, per-entity admin analytics, deterministic restock/fraud/pricing/churn signals, on-demand AI review-sentiment, admin low-stock digest. Post-audit (REQ-1655): re-verified invalidation/auth/zod/dead-code across Phase 8, fixed the `/email/send` open-relay gap. Coolify/VPS deferred. Live demo still legacy AWS (`codebook-aws.vercel.app`). Gate 2 / Red Team optional. Lint+tsc+build clean FE+BE (full sweep).
+C1 Phases 1–9 done, audited twice (REQ-1200…1667), 78-file diff clean and uncommitted pending user go-ahead. Catalog: 17 books. Phase 8: payment-tampering fix, auto-refund-on-cancel, invoice download, order idempotency, per-entity admin analytics, deterministic restock/fraud/pricing/churn signals, on-demand AI review-sentiment, admin low-stock digest, `/email/send` open-relay fix. Phase 9: wishlist, back-in-stock alerts, coupons, guest checkout, live Shippo webhook, scheduled digest+AI-summary jobs, CSV import/export, return/RMA, refresh tokens, AI description generator, fuzzy search, AI ticket-reply drafts. Post-implementation re-audit (this pass) found only minor hardening gaps, all fixed: Shippo webhook secret compare made timing-safe, stock-alert subscribe rate-limited, `services/index.ts` barrel completed for the 5 services that were missing from it. No functional/architectural gaps found. Coolify/VPS deferred. Live demo still legacy AWS. Gate 2 / Red Team optional. Lint+tsc+build clean FE+BE.

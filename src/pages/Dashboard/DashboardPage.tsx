@@ -6,6 +6,7 @@ import { DashboardCard } from "./components/DashboardCard";
 import { DashboardCardSkeleton } from "./components/DashboardCardSkeleton";
 import { DashboardEmpty } from "./components/DashboardEmpty";
 import { AddressBook } from "./components/AddressBook";
+import { WishlistSection } from "./components/WishlistSection";
 
 export const DashboardPage = () => {
   useTitle("Dashboard");
@@ -44,6 +45,10 @@ export const DashboardPage = () => {
 
       <section className="">
         <AddressBook />
+      </section>
+
+      <section className="">
+        <WishlistSection />
       </section>
 
       <section>

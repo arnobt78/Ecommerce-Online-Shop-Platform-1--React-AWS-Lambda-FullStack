@@ -5,11 +5,13 @@
 
 import express, { type Request, type Response } from "express";
 import Stripe from "stripe";
+import { randomUUID } from "crypto";
 import { successResponse, errorResponse } from "../lib/response";
-import { requireAuth } from "../lib/auth";
+import { optionalAuth } from "../lib/auth";
 import { paymentLimiter } from "../lib/rateLimit";
 import * as ordersService from "../services/orders.service";
 import { getProductsByIds } from "../services/products.service";
+import { validateAndApplyCoupon } from "../services/coupons.service";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
@@ -22,15 +24,30 @@ interface CartLineItem {
   quantity?: unknown;
 }
 
-// POST /payment/create-intent
-router.post("/payment/create-intent", paymentLimiter, requireAuth, async (req: Request, res: Response) => {
+// POST /payment/create-intent — REQ-1659: optionalAuth instead of requireAuth
+// so a guest (no account) can check out too, provided they supply a valid
+// guestEmail. Authenticated checkout is completely unaffected.
+router.post("/payment/create-intent", paymentLimiter, optionalAuth, async (req: Request, res: Response) => {
   try {
     if (!stripe) return errorResponse(res, "Payment service is not configured. Please contact support.", 500);
 
-    const { cartList, currency = "usd" } = req.body || {};
+    const { cartList, currency = "usd", couponCode, guestEmail } = req.body || {};
     if (!Array.isArray(cartList) || cartList.length === 0) {
       return errorResponse(res, "Cart is empty.", 400);
     }
+
+    // REQ-1659: a guest must supply a valid-looking email; a logged-in user
+    // needs nothing extra. This is the one place a synthetic "guest_<uuid>"
+    // identity is minted — reused as-is by /orders below via metadata.userId,
+    // never a real User.id, so every existing `order.userId !== req.user.id`
+    // ownership check elsewhere in the codebase keeps working unmodified.
+    const isGuestCheckout = !req.user;
+    if (isGuestCheckout && (typeof guestEmail !== "string" || !/^\S+@\S+\.\S+$/.test(guestEmail))) {
+      return errorResponse(res, "A valid email is required to check out as a guest.", 400);
+    }
+    const effectiveUserId = req.user?.id || `guest_${randomUUID()}`;
+    const effectiveUserEmail = req.user?.email || guestEmail;
+    const effectiveUserName = req.user?.name || "Guest";
 
     // Security: the charge amount is never trusted from the client — it is
     // always recomputed here from live DB prices, so a tampered request body
@@ -51,6 +68,21 @@ router.post("/payment/create-intent", paymentLimiter, requireAuth, async (req: R
       amountInCents += Math.round(price * 100) * quantity;
     }
 
+    // REQ-1658: coupon discount is recomputed server-side from the same
+    // server-computed subtotal above — never trust a client-sent discount.
+    let discountAmountCents = 0;
+    let appliedCouponCode: string | undefined;
+    if (typeof couponCode === "string" && couponCode.trim()) {
+      try {
+        const result = await validateAndApplyCoupon(couponCode, amountInCents);
+        discountAmountCents = result.discountAmountCents;
+        appliedCouponCode = result.coupon.code;
+      } catch (couponError) {
+        return errorResponse(res, couponError instanceof Error ? couponError.message : "Invalid coupon code", 400);
+      }
+    }
+    amountInCents = Math.max(0, amountInCents - discountAmountCents);
+
     if (amountInCents < 50) {
       return errorResponse(res, "Invalid order total. Minimum is $0.50.", 400);
     }
@@ -60,14 +92,16 @@ router.post("/payment/create-intent", paymentLimiter, requireAuth, async (req: R
       currency: typeof currency === "string" ? currency.toLowerCase() : "usd",
       automatic_payment_methods: { enabled: true },
       metadata: {
-        // Trusted fields set from the verified JWT last, so nothing in the
-        // request body can spoof another user's identity on this charge —
-        // handlePaymentSuccess() below trusts metadata.userId for the webhook
-        // fallback order-creation path.
-        userId: req.user!.id,
-        userEmail: req.user!.email,
-        userName: req.user!.name || "Guest",
+        // Trusted fields set from the verified JWT (or the freshly-minted
+        // guest identity above) last, so nothing in the request body can
+        // spoof another user's identity on this charge — handlePaymentSuccess()
+        // below and /orders both trust metadata.userId, never the request body.
+        userId: effectiveUserId,
+        userEmail: effectiveUserEmail || "",
+        userName: effectiveUserName,
         itemCount: String(cartList.length),
+        ...(isGuestCheckout && { isGuest: "true" }),
+        ...(appliedCouponCode && { couponCode: appliedCouponCode, discountAmount: String(discountAmountCents) }),
       },
     });
 
@@ -77,6 +111,11 @@ router.post("/payment/create-intent", paymentLimiter, requireAuth, async (req: R
       amount: paymentIntent.amount,
       currency: paymentIntent.currency,
       status: paymentIntent.status,
+      // REQ-1659: the frontend reuses this exact userId (real or synthetic
+      // guest id) when it later calls POST /orders for this same payment.
+      userId: effectiveUserId,
+      isGuest: isGuestCheckout,
+      ...(appliedCouponCode && { couponCode: appliedCouponCode, discountAmount: discountAmountCents }),
     });
   } catch (error) {
     console.error("Create payment intent error:", error);
@@ -88,13 +127,19 @@ router.post("/payment/create-intent", paymentLimiter, requireAuth, async (req: R
   }
 });
 
-// GET /payment/verify/:id
-router.get("/payment/verify/:id", requireAuth, async (req: Request, res: Response) => {
+// GET /payment/verify/:id — REQ-1659: optionalAuth so a guest can verify
+// their own just-created payment intent too. The paymentIntentId itself is
+// an unguessable Stripe-generated id (functions like a bearer secret for the
+// guest's own checkout session), so a guest payment intent is readable by
+// anyone holding that id — same trust model as the Stripe clientSecret
+// already handed to the browser for this exact payment.
+router.get("/payment/verify/:id", paymentLimiter, optionalAuth, async (req: Request, res: Response) => {
   try {
     if (!stripe) return errorResponse(res, "Payment service is not configured. Please contact support.", 500);
 
     const paymentIntent = await stripe.paymentIntents.retrieve(req.params.id!);
-    if (paymentIntent.metadata?.userId !== req.user!.id) {
+    const isGuestPaymentIntent = paymentIntent.metadata?.isGuest === "true";
+    if (!isGuestPaymentIntent && paymentIntent.metadata?.userId !== req.user?.id) {
       return errorResponse(res, "Payment intent does not belong to this user", 403);
     }
 
@@ -132,6 +177,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent): Promis
 
   // Fallback: frontend normally creates the full order with cart details;
   // this covers the edge case where the webhook fires before that happens.
+  const isGuest = metadata?.isGuest === "true";
   await ordersService.createOrder({
     cartList: [],
     amount_paid: amount / 100,
@@ -140,6 +186,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent): Promis
     paymentIntentId,
     paymentStatus: "paid",
     status: "pending",
+    ...(isGuest && { isGuest: true, guestEmail: metadata?.userEmail }),
   });
 }
 

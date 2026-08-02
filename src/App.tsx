@@ -3,10 +3,14 @@ import { useLocation } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { AllRoutes } from "./routes/AllRoutes";
 import { Footer, Header } from "./components";
+import { useTokenRefresh } from "./hooks/useTokenRefresh";
 
 function App() {
   const location = useLocation();
   const prefersReducedMotion = useReducedMotion();
+
+  // REQ-1667 — silent access-token renewal, mounted once at the app root.
+  useTokenRefresh();
 
   // Check if current route is an admin route
   const isAdminRoute = location.pathname.startsWith("/admin");

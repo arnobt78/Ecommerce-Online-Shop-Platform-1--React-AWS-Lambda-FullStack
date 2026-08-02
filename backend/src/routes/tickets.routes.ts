@@ -11,6 +11,7 @@ import * as ticketsService from "../services/tickets.service";
 import { createTicketSchema, replyTicketSchema } from "../services/tickets.service";
 import { getUserById } from "../services/users.service";
 import { getOrderById } from "../services/orders.service";
+import { generateTicketReplyDraft, AiInsightsUnavailableError } from "../services/aiInsights.service";
 
 const router = express.Router();
 
@@ -97,6 +98,35 @@ router.get("/:ticketId", async (req: Request, res: Response) => {
     return successResponse(res, ticket);
   } catch (error) {
     console.error("Ticket detail error:", error);
+    return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
+  }
+});
+
+// POST /tickets/:ticketId/generate-reply — REQ-1666, admin only. Drafts a
+// reply for the admin to review/edit before sending — never auto-sent.
+router.post("/:ticketId/generate-reply", async (req: Request, res: Response) => {
+  try {
+    const user = await getUserById(req.user!.id);
+    if (!user) return errorResponse(res, "User not found", 404);
+    if (user.role !== "admin") return errorResponse(res, "Unauthorized: Admin access required", 403);
+
+    const ticket = await ticketsService.getTicketById(req.params.ticketId!);
+    if (!ticket) return errorResponse(res, "Ticket not found", 404);
+
+    const messages = Array.isArray(ticket.messages) ? (ticket.messages as Array<{ message?: string; senderRole?: string }>) : [];
+    const result = await generateTicketReplyDraft({
+      subject: ticket.subject,
+      category: ticket.category,
+      priority: ticket.priority,
+      messages: messages.map((m) => ({ message: m.message || "", senderRole: m.senderRole || "customer" })),
+    });
+
+    return successResponse(res, result);
+  } catch (error) {
+    if (error instanceof AiInsightsUnavailableError) {
+      return errorResponse(res, { message: error.message, code: error.code }, 503);
+    }
+    console.error("Ticket reply draft error:", error);
     return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
   }
 });

@@ -1,12 +1,15 @@
 import { useEffect } from "react";
 import { useState } from "react";
+import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { User, XCircle, AlertTriangle, CheckCircle2, Plus, Trash2 } from "lucide-react";
+import { User, XCircle, AlertTriangle, CheckCircle2, Plus, Trash2, Heart } from "lucide-react";
 import { useCart } from "../../context";
 import { Rating } from "./Rating";
 import { RippleButton } from "../ui/ripple-button";
 import { BookCover } from "../ui/book-cover";
+import { toast } from "../../lib/toast";
+import { useWishlistedProductIds, useAddToWishlist, useRemoveFromWishlist } from "../../hooks/useWishlist";
 import {
   getProductImageUrl,
   getProductImageKey,
@@ -23,6 +26,29 @@ export const ProductCard = ({ product }: ProductCardProps) => {
   const { id, name, author, overview, price, rating, best_seller } = product;
   const productImageUrl = getProductImageUrl(product);
   const queryClient = useQueryClient();
+
+  // REQ-1656: wishlist toggle — Set lookup keeps this O(1) per card even
+  // across a large product grid, all derived from one shared cached query.
+  const wishlistedIds = useWishlistedProductIds();
+  const isWishlisted = wishlistedIds.has(id);
+  const addToWishlistMutation = useAddToWishlist();
+  const removeFromWishlistMutation = useRemoveFromWishlist();
+  const wishlistPending = addToWishlistMutation.isPending || removeFromWishlistMutation.isPending;
+
+  const handleWishlistToggle = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const hasToken = typeof window !== "undefined" && !!sessionStorage.getItem("token");
+    if (!hasToken) {
+      toast.error("Please log in to save items to your wishlist", { closeButton: true, position: "bottom-right" });
+      return;
+    }
+    if (isWishlisted) {
+      removeFromWishlistMutation.mutate(id);
+    } else {
+      addToWishlistMutation.mutate(id);
+    }
+  };
 
   // Instant navigation: this card already holds the full Product object (from
   // the list query), so seed ProductDetail's ["product", id] cache directly on
@@ -50,6 +76,21 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             Best Seller
           </span>
         )}
+        {/* REQ-1656 — wishlist toggle, top-right of the cover so it never
+            overlaps the "Best Seller" badge on the left */}
+        <button
+          type="button"
+          onClick={handleWishlistToggle}
+          disabled={wishlistPending}
+          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          aria-pressed={isWishlisted}
+          className="absolute top-2 right-2 z-10 rounded-full bg-white/90 dark:bg-gray-900/80 p-1.5 shadow-sm backdrop-blur-sm transition-transform hover:scale-110 disabled:opacity-60"
+        >
+          <Heart
+            className={`h-4 w-4 ${isWishlisted ? "fill-red-500 text-red-500" : "text-gray-500 dark:text-gray-300"}`}
+            strokeWidth={2}
+          />
+        </button>
         {product.coverColor ? (
           // Book-cover style enrichment (REQ: university-library parity) — falls
           // back to the flat image below for products without a coverColor.

@@ -6,96 +6,20 @@
 import express, { type Request, type Response } from "express";
 import Stripe from "stripe";
 import { successResponse, errorResponse } from "../lib/response";
-import { requireAuth, requireAdmin } from "../lib/auth";
+import { requireAuth, requireAdmin, optionalAuth } from "../lib/auth";
 import { paymentLimiter } from "../lib/rateLimit";
 import { logActivity, getOrderActivityTimeline } from "../services/activityLog.service";
 import * as ordersService from "../services/orders.service";
 import { createOrderSchema } from "../services/orders.service";
-import { incrementProductStock } from "../services/products.service";
 import { generateShippoLabel } from "../services/shipping.service";
 import { generateInvoicePdf } from "../services/invoice.service";
+import { toCsv } from "../lib/csv";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 export const publicRouter = express.Router();
 export const adminRouter = express.Router();
-
-interface RefundResult {
-  updatedOrder: Awaited<ReturnType<typeof ordersService.updateOrderWithRefund>>;
-  refund: Stripe.Response<Stripe.Refund>;
-  stockRestoreResults: Array<Record<string, unknown>>;
-}
-
-// Stripe's own `reason` param is a fixed 3-value enum for its dispute/reporting
-// tooling — it is NOT a free-text field. The admin-facing "reason" (REQ-1643,
-// e.g. "customer requested shipping delay refund") is our own audit-log note
-// and must never be forwarded to Stripe as-is, or the API call 400s.
-const STRIPE_REFUND_REASONS = new Set<Stripe.RefundCreateParams.Reason>(["duplicate", "fraudulent", "requested_by_customer"]);
-function toStripeRefundReason(reason?: string): Stripe.RefundCreateParams.Reason {
-  return reason && STRIPE_REFUND_REASONS.has(reason as Stripe.RefundCreateParams.Reason) ? (reason as Stripe.RefundCreateParams.Reason) : "requested_by_customer";
-}
-
-// Shared by the explicit "Process Refund" action and by cancelling a paid
-// order (REQ-1639/1643) — a paid order that's cancelled must actually return
-// the customer's money via the same Stripe flow, not just flip a status text.
-async function refundOrderPayment(
-  order: NonNullable<Awaited<ReturnType<typeof ordersService.getOrderById>>>,
-  options: { amount?: number; reason?: string }
-): Promise<RefundResult> {
-  if (!stripe) throw new Error("Payment service is not configured. Please contact support.");
-
-  const paymentIntentId = order.paymentIntentId;
-  if (!paymentIntentId) throw new Error("Order does not have a payment intent ID. Cannot process refund.");
-
-  const wasAlreadyCancelled = order.status === "cancelled";
-  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-  const chargeId = paymentIntent.latest_charge;
-  if (!chargeId) throw new Error("Payment intent does not have a charge. Cannot process refund.");
-
-  const refundParams: Stripe.RefundCreateParams = {
-    charge: typeof chargeId === "string" ? chargeId : chargeId.id,
-    reason: toStripeRefundReason(options.reason),
-  };
-  if (options.amount && options.amount > 0) {
-    const orderAmountInCents = Math.round((order.amount_paid || 0) * 100);
-    if (options.amount > orderAmountInCents) {
-      throw new Error(`Refund amount (${options.amount} cents) exceeds order amount (${orderAmountInCents} cents)`);
-    }
-    refundParams.amount = options.amount;
-  }
-
-  const refund = await stripe.refunds.create(refundParams);
-
-  const stockRestoreResults: Array<Record<string, unknown>> = [];
-  const cartList = order.cartList as Array<{ id?: string; name?: string; productName?: string; quantity?: number }>;
-  if (!wasAlreadyCancelled && Array.isArray(cartList)) {
-    for (const item of cartList) {
-      if (!item.id || !item.quantity) continue;
-      try {
-        const updatedProduct = await incrementProductStock(item.id, item.quantity);
-        stockRestoreResults.push({
-          productId: item.id,
-          productName: item.name || item.productName || "Product",
-          quantity: item.quantity,
-          newStock: updatedProduct.stock,
-          success: true,
-        });
-      } catch (stockError) {
-        stockRestoreResults.push({
-          productId: item.id,
-          productName: item.name || item.productName || "Product",
-          quantity: item.quantity,
-          success: false,
-          error: stockError instanceof Error ? stockError.message : String(stockError),
-        });
-      }
-    }
-  }
-
-  const updatedOrder = await ordersService.updateOrderWithRefund(order.id, refund.id, refund.amount);
-  return { updatedOrder, refund, stockRestoreResults };
-}
 
 // GET /orders — always the authenticated user's own orders (dashboard), regardless of role.
 // Parity with functions/orders/index.js GET.
@@ -134,6 +58,29 @@ publicRouter.get("/orders/:id", requireAuth, async (req: Request, res: Response)
   }
 });
 
+// GET /orders/guest/:orderId?email= — REQ-1659: no-auth lookup for a guest's
+// own order (order id + the exact email used at checkout must both match —
+// the id alone is a UUID and not realistically guessable, and requiring the
+// email too means a leaked/shared order-confirmation link can't be replayed
+// by itself to load a stranger's order).
+publicRouter.get("/orders/guest/:orderId", paymentLimiter, async (req: Request, res: Response) => {
+  try {
+    const email = typeof req.query.email === "string" ? req.query.email : "";
+    if (!email) return errorResponse(res, "Email is required", 400);
+
+    const order = await ordersService.getOrderById(req.params.orderId!);
+    if (!order || !order.isGuest || (order.guestEmail || "").toLowerCase() !== email.toLowerCase()) {
+      return errorResponse(res, "Order not found", 404);
+    }
+
+    const timeline = await getOrderActivityTimeline(order.id);
+    return successResponse(res, { ...order, timeline });
+  } catch (error) {
+    console.error("Guest order lookup error:", error);
+    return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
+  }
+});
+
 // GET /orders/:id/invoice — REQ-1640: on-demand PDF download, reusing the
 // same generateInvoicePdf() the order-confirmation email already attaches
 // (REQ-1612) instead of a separate invoice-storage system.
@@ -168,15 +115,24 @@ publicRouter.get("/orders/:id/invoice", requireAuth, async (req: Request, res: R
   }
 });
 
-// POST /orders — parity with functions/orders/index.js POST.
-publicRouter.post("/orders", paymentLimiter, requireAuth, async (req: Request, res: Response) => {
+// POST /orders — parity with functions/orders/index.js POST. REQ-1659:
+// optionalAuth instead of requireAuth so a guest checkout can create its
+// order too; a guest MUST supply a paymentIntentId (no "pay later" guest
+// flow) and its identity is verified entirely against the Stripe
+// PaymentIntent's own metadata below, never trusted from the request body.
+publicRouter.post("/orders", paymentLimiter, optionalAuth, async (req: Request, res: Response) => {
   try {
     const parsed = createOrderSchema.safeParse(req.body);
     if (!parsed.success) {
       return errorResponse(res, parsed.error.issues[0]?.message || "Invalid order data", 400);
     }
-    if (parsed.data.user.id !== req.user!.id) {
-      return errorResponse(res, "Unauthorized: User ID mismatch", 403);
+
+    if (req.user) {
+      if (parsed.data.user.id !== req.user.id) {
+        return errorResponse(res, "Unauthorized: User ID mismatch", 403);
+      }
+    } else if (!parsed.data.paymentIntentId) {
+      return errorResponse(res, "Guest checkout requires a completed payment", 400);
     }
 
     // Security: amount_paid must reflect what Stripe actually charged, not
@@ -184,19 +140,39 @@ publicRouter.post("/orders", paymentLimiter, requireAuth, async (req: Request, r
     // of trusted from the request body (mirrors the recomputation done at
     // charge time in payment.routes.ts).
     let amountPaid = parsed.data.amount_paid;
+    // REQ-1658: coupon fields are read from the verified PaymentIntent's own
+    // metadata below, overwriting anything the client sent in parsed.data.
+    let couponCode: string | undefined;
+    let discountAmount: number | undefined;
+    let isGuest = false;
+    let guestEmail: string | undefined;
     if (parsed.data.paymentIntentId) {
       if (!stripe) return errorResponse(res, "Payment service is not configured. Please contact support.", 500);
       const paymentIntent = await stripe.paymentIntents.retrieve(parsed.data.paymentIntentId);
-      if (paymentIntent.metadata?.userId !== req.user!.id) {
-        return errorResponse(res, "Payment intent does not belong to this user", 403);
+      isGuest = paymentIntent.metadata?.isGuest === "true";
+
+      if (req.user) {
+        if (paymentIntent.metadata?.userId !== req.user.id) {
+          return errorResponse(res, "Payment intent does not belong to this user", 403);
+        }
+      } else {
+        // REQ-1659: guest identity is the synthetic id minted at create-intent
+        // time — must match both the metadata AND what the client claims.
+        if (!isGuest || paymentIntent.metadata?.userId !== parsed.data.user.id) {
+          return errorResponse(res, "Payment intent does not belong to this guest checkout", 403);
+        }
+        guestEmail = paymentIntent.metadata?.userEmail || undefined;
       }
+
       if (paymentIntent.status !== "succeeded") {
         return errorResponse(res, "Payment has not succeeded yet", 400);
       }
       amountPaid = paymentIntent.amount / 100;
+      couponCode = paymentIntent.metadata?.couponCode || undefined;
+      discountAmount = paymentIntent.metadata?.discountAmount ? Number(paymentIntent.metadata.discountAmount) : undefined;
     }
 
-    const order = await ordersService.createOrder({ ...parsed.data, amount_paid: amountPaid });
+    const order = await ordersService.createOrder({ ...parsed.data, amount_paid: amountPaid, couponCode, discountAmount, isGuest, guestEmail });
     return successResponse(res, order, 201);
   } catch (error) {
     console.error("Order create error:", error);
@@ -212,6 +188,52 @@ adminRouter.get("/admin/orders", requireAuth, requireAdmin, async (_req: Request
   } catch (error) {
     console.error("Admin orders list error:", error);
     return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);
+  }
+});
+
+// GET /admin/orders/export — REQ-1662: export only, no import counterpart.
+// Orders are historical transactional records created exclusively through
+// the real checkout flow (Stripe payment verification, stock
+// decrement/idempotency, REQ-1637/1641) — bulk-creating them from a CSV
+// would bypass every one of those guarantees and is a data-integrity/fraud
+// risk, not a legitimate admin workflow. Products (a catalog, not a ledger)
+// don't carry that risk, which is why only products get an import route.
+adminRouter.get("/admin/orders/export", requireAuth, requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const orders = await ordersService.getAllOrders();
+    const rows = orders.map((o) => {
+      const orderUser = o.user as { name?: string; email?: string } | null;
+      return {
+        id: o.id,
+        customerName: orderUser?.name ?? "",
+        customerEmail: orderUser?.email ?? "",
+        amount_paid: o.amount_paid,
+        quantity: o.quantity,
+        status: o.status,
+        paymentStatus: o.paymentStatus ?? "",
+        paymentIntentId: o.paymentIntentId ?? "",
+        trackingNumber: o.trackingNumber ?? "",
+        trackingCarrier: o.trackingCarrier ?? "",
+        couponCode: o.couponCode ?? "",
+        discountAmount: o.discountAmount != null ? (o.discountAmount / 100).toFixed(2) : "",
+        refundAmount: o.refundAmount != null ? (o.refundAmount / 100).toFixed(2) : "",
+        isGuest: String(o.isGuest),
+        createdAt: o.createdAt.toISOString(),
+      };
+    });
+
+    const columns = [
+      "id", "customerName", "customerEmail", "amount_paid", "quantity", "status", "paymentStatus",
+      "paymentIntentId", "trackingNumber", "trackingCarrier", "couponCode", "discountAmount",
+      "refundAmount", "isGuest", "createdAt",
+    ];
+    const csv = toCsv(rows, columns);
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="orders-export-${new Date().toISOString().slice(0, 10)}.csv"`);
+    return res.send(csv);
+  } catch (error) {
+    console.error("Order export error:", error);
+    return errorResponse(res, { message: error instanceof Error ? error.message : "Failed to export orders" }, 500);
   }
 });
 
@@ -249,7 +271,7 @@ adminRouter.put("/admin/orders/:id/status", requireAuth, requireAdmin, async (re
       status === "cancelled" && existingOrder.paymentStatus === "paid" && existingOrder.status !== "refunded" && !!existingOrder.paymentIntentId;
 
     if (isCancellingPaidOrder) {
-      const { updatedOrder, refund, stockRestoreResults } = await refundOrderPayment(existingOrder, { reason });
+      const { updatedOrder, refund, stockRestoreResults } = await ordersService.refundOrderPayment(existingOrder, { reason });
 
       logActivity({
         userId: req.user!.id,
@@ -445,7 +467,7 @@ adminRouter.post("/admin/orders/:id/refund", requireAuth, requireAdmin, async (r
     }
 
     const { amount, reason } = (req.body || {}) as { amount?: unknown; reason?: unknown };
-    const { updatedOrder, refund, stockRestoreResults } = await refundOrderPayment(order, {
+    const { updatedOrder, refund, stockRestoreResults } = await ordersService.refundOrderPayment(order, {
       amount: typeof amount === "number" ? amount : undefined,
       reason: typeof reason === "string" ? reason : undefined,
     });

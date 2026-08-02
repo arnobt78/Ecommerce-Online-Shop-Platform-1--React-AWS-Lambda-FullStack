@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { Star, XCircle, AlertTriangle, CheckCircle2, FileText, BookOpen, User, ShoppingCart, Trash2, Barcode, Hash, Building2, Calendar, Layers, Globe, Tag, BarChart3, type LucideIcon } from "lucide-react";
+import { Star, XCircle, AlertTriangle, CheckCircle2, FileText, BookOpen, User, ShoppingCart, Trash2, Barcode, Hash, Building2, Calendar, Layers, Globe, Tag, BarChart3, Heart, BellRing, type LucideIcon } from "lucide-react";
 import { toast } from "../lib/toast";
 import { useTitle } from "../hooks/useTitle";
 import {
@@ -15,6 +15,8 @@ import { BookCover, ProductVideo, ProductReel } from "../components/ui";
 import { useCart } from "../context";
 import { useProduct, useRecommendedProducts } from "../hooks/useProducts";
 import { useUserOrders } from "../hooks/useUser";
+import { useWishlistedProductIds, useAddToWishlist, useRemoveFromWishlist } from "../hooks/useWishlist";
+import { useCreateStockAlert } from "../hooks/useStockAlert";
 import {
   useReviewsByProduct,
   useCreateReview,
@@ -85,6 +87,48 @@ export const ProductDetail = () => {
   const createReviewMutation = useCreateReview();
   const updateReviewMutation = useUpdateReview();
   const deleteReviewMutation = useDeleteReview();
+
+  // REQ-1656 — wishlist toggle
+  const wishlistedIds = useWishlistedProductIds();
+  const isWishlisted = !!product.id && wishlistedIds.has(product.id);
+  const addToWishlistMutation = useAddToWishlist();
+  const removeFromWishlistMutation = useRemoveFromWishlist();
+  const wishlistPending = addToWishlistMutation.isPending || removeFromWishlistMutation.isPending;
+  const handleWishlistToggle = () => {
+    if (!product.id) return;
+    const hasToken = typeof window !== "undefined" && !!sessionStorage.getItem("token");
+    if (!hasToken) {
+      toast.error("Please log in to save items to your wishlist", { closeButton: true, position: "bottom-right" });
+      return;
+    }
+    if (isWishlisted) removeFromWishlistMutation.mutate(product.id);
+    else addToWishlistMutation.mutate(product.id);
+  };
+
+  // REQ-1657 — "Notify me" back-in-stock subscription. Logged-in users
+  // subscribe with their account email in one click; guests get a compact
+  // inline email input instead of a full modal (no generic modal component
+  // exists in this codebase for input collection, only AlertDialog for
+  // confirmations — see AddressBook's inline-form precedent).
+  const [showNotifyEmailInput, setShowNotifyEmailInput] = useState(false);
+  const [notifyEmail, setNotifyEmail] = useState("");
+  const createStockAlertMutation = useCreateStockAlert();
+  const sessionUserEmail = typeof window !== "undefined" ? sessionStorage.getItem("userEmail") : null;
+  const handleNotifyMeClick = () => {
+    if (!product.id) return;
+    if (sessionUserEmail) {
+      createStockAlertMutation.mutate({ productId: product.id, email: sessionUserEmail });
+      return;
+    }
+    setShowNotifyEmailInput(true);
+  };
+  const handleNotifyEmailSubmit = () => {
+    if (!product.id || !notifyEmail.trim()) return;
+    createStockAlertMutation.mutate(
+      { productId: product.id, email: notifyEmail.trim() },
+      { onSuccess: () => setShowNotifyEmailInput(false) },
+    );
+  };
 
   useTitle(product.name);
 
@@ -320,7 +364,7 @@ export const ProductDetail = () => {
               </span>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               {!inCart ? (
                 <button
                   onClick={() => {
@@ -348,7 +392,54 @@ export const ProductDetail = () => {
                   Remove From Cart
                 </button>
               )}
+
+              {/* REQ-1656 — wishlist toggle */}
+              <button
+                type="button"
+                onClick={handleWishlistToggle}
+                disabled={wishlistPending}
+                aria-pressed={isWishlisted}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-3.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                <Heart className={`h-4 w-4 ${isWishlisted ? "fill-red-500 text-red-500" : ""}`} strokeWidth={2} />
+                {isWishlisted ? "Saved" : "Save"}
+              </button>
             </div>
+
+            {/* REQ-1657 — "Notify me" back-in-stock subscription, only shown when out of stock */}
+            {!product.in_stock && (
+              <div className="mt-3">
+                {!showNotifyEmailInput ? (
+                  <button
+                    type="button"
+                    onClick={handleNotifyMeClick}
+                    disabled={createStockAlertMutation.isPending}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:underline disabled:opacity-60 dark:text-blue-400"
+                  >
+                    <BellRing className="h-4 w-4" strokeWidth={2} />
+                    {createStockAlertMutation.isPending ? "Subscribing..." : "Notify me when back in stock"}
+                  </button>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="email"
+                      value={notifyEmail}
+                      onChange={(e) => setNotifyEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-56 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleNotifyEmailSubmit}
+                      disabled={createStockAlertMutation.isPending || !notifyEmail.trim()}
+                      className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-60"
+                    >
+                      Notify Me
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Book Details — a tidy scannable grid instead of a wall of colored pills */}
             {hasBookDetails && (

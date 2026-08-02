@@ -318,6 +318,16 @@ User replied "yes continue" to close out the page-redesign initiative's final tw
 - Live-verified: created a fresh test guest order, confirmed all 4 new fields present in the real `GET /orders/guest/:orderId` JSON response, submitted a real end-to-end guest return request successfully, then deleted the test order/return. `tsc`/`eslint --max-warnings=0`/production build clean both sides; `prisma db push` re-confirmed zero schema drift.
 - Not committed this pass — awaiting user go-ahead per the standing CLAUDE.md commit rule.
 
+## Twenty-third pass — pattern-matched the guest-returns fix onto invoice download (REQ-1673), continued session (2026-08-02)
+
+- User asked, again, to re-check everything is secured/safe, noting each prior audit had found something. Instead of a generic re-sweep, proactively pattern-matched REQ-1671's fix (guest checkout orders lacked a return-request path) against every other customer self-service action to find the same class of gap before being told about it.
+- Found `GET /orders/:id/invoice` (REQ-1640) had the identical shape: `requireAuth`-only, no guest fallback, and `GuestOrderLookupPage.tsx` had zero invoice UI at all — a guest who lost their confirmation email had no way to re-download the invoice it originally attached.
+- Fixed with the exact established pattern: `optionalAuth` + `?email=` verified against `Order.guestEmail`, `paymentLimiter` added (now guest-reachable). Refactored `downloadOrderInvoice()` in `dataService.ts` to extract a shared `fetchAndDownloadInvoice()` helper instead of duplicating the blob-download logic in a new `downloadGuestOrderInvoice()`. Added an "Invoice" button to `GuestOrderLookupPage.tsx`, verifying against `order.guestEmail` (not the live email input) — same stale-input reasoning as REQ-1672.
+- Explicitly confirmed no further guest-parity gaps remain: `GET /orders`/`GET /orders/:id` (authenticated "my orders") correctly stay `requireAuth`-only since guests have no session to list by — they already use the separate guest-lookup route, which is the correct equivalent, not a gap.
+- Re-confirmed the REQ-1671 router-scoping bug class introduced no new instances this round.
+- Live-verified: created a fresh test guest order, downloaded a real invoice PDF with the correct email (valid PDF magic bytes confirmed), wrong-email and no-email both correctly 404, an authenticated user still gets 403 on another guest's order — then deleted the test order. `tsc`/`eslint --max-warnings=0`/production build clean both sides.
+- Not committed this pass — awaiting user go-ahead per the standing CLAUDE.md commit rule.
+
 ## File Index
 
 | File | Purpose |

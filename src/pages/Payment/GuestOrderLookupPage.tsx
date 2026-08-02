@@ -7,19 +7,22 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Search, Package } from "lucide-react";
+import { Search, Package, Download } from "lucide-react";
 import { useTitle } from "../../hooks/useTitle";
 import { useGuestOrder } from "../../hooks/useGuestOrder";
 import { useCreateGuestReturnRequest } from "../../hooks/useReturns";
 import { formatPrice } from "../../utils/formatPrice";
-import { Card, PageHeader, StatusBadge, LoadingState, ErrorState, OrderTimeline } from "../../components/ui";
+import { Card, PageHeader, StatusBadge, LoadingState, ErrorState, OrderTimeline, RippleButton } from "../../components/ui";
 import { ReturnRequestSection } from "../../components";
+import { downloadGuestOrderInvoice } from "../../services";
+import { toast } from "../../lib/toast";
 
 export const GuestOrderLookupPage = () => {
   useTitle("Track Your Order");
   const [orderId, setOrderId] = useState("");
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
 
   const { data: order, isLoading, error } = useGuestOrder(orderId.trim(), email.trim(), submitted);
   const createGuestReturnMutation = useCreateGuestReturnRequest();
@@ -28,6 +31,24 @@ export const GuestOrderLookupPage = () => {
     e.preventDefault();
     if (!orderId.trim() || !email.trim()) return;
     setSubmitted(true);
+  };
+
+  // REQ-1673: same on-demand invoice re-download as OrderDetailPage, verified
+  // against order.guestEmail (not the live input) for the same reason as the
+  // return-request submission below.
+  const handleDownloadInvoice = async () => {
+    if (!order) return;
+    setIsDownloadingInvoice(true);
+    try {
+      await downloadGuestOrderInvoice(order.id, order.guestEmail || email.trim());
+    } catch (downloadError) {
+      toast.error(downloadError instanceof Error ? downloadError.message : "Failed to download invoice", {
+        closeButton: true,
+        position: "bottom-right",
+      });
+    } finally {
+      setIsDownloadingInvoice(false);
+    }
   };
 
   return (
@@ -98,7 +119,17 @@ export const GuestOrderLookupPage = () => {
                 <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" strokeWidth={2} />
                 Order #{order.id.slice(0, 8)}
               </h2>
-              <StatusBadge status={order.status} />
+              <div className="flex items-center gap-3">
+                <StatusBadge status={order.status} />
+                <RippleButton
+                  onClick={handleDownloadInvoice}
+                  disabled={isDownloadingInvoice}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Download className="h-4 w-4" strokeWidth={2} />
+                  {isDownloadingInvoice ? "Downloading..." : "Invoice"}
+                </RippleButton>
+              </div>
             </div>
             <div className="space-y-2 text-sm">
               {order.cartList?.map((item, i) => (

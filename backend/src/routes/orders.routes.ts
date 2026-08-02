@@ -88,15 +88,25 @@ publicRouter.get("/orders/guest/:orderId", paymentLimiter, async (req: Request, 
 
 // GET /orders/:id/invoice — REQ-1640: on-demand PDF download, reusing the
 // same generateInvoicePdf() the order-confirmation email already attaches
-// (REQ-1612) instead of a separate invoice-storage system.
-publicRouter.get("/orders/:id/invoice", requireAuth, async (req: Request, res: Response) => {
+// (REQ-1612) instead of a separate invoice-storage system. REQ-1673:
+// optionalAuth so a guest checkout order can re-download its own invoice too
+// (?email= verified against Order.guestEmail), same pattern as guest order
+// lookup and guest return requests.
+publicRouter.get("/orders/:id/invoice", paymentLimiter, optionalAuth, async (req: Request, res: Response) => {
   try {
     const orderId = req.params.id!;
     const order = await ordersService.getOrderById(orderId);
     if (!order) return errorResponse(res, "Order not found", 404);
 
-    if (order.userId !== req.user!.id && req.user!.role !== "admin") {
-      return errorResponse(res, "Unauthorized: Cannot access another user's order", 403);
+    if (req.user) {
+      if (order.userId !== req.user.id && req.user.role !== "admin") {
+        return errorResponse(res, "Unauthorized: Cannot access another user's order", 403);
+      }
+    } else {
+      const email = typeof req.query.email === "string" ? req.query.email : "";
+      if (!order.isGuest || !email || (order.guestEmail || "").toLowerCase() !== email.toLowerCase()) {
+        return errorResponse(res, "Order not found", 404);
+      }
     }
 
     const orderUser = order.user as { name?: string; email?: string } | null;

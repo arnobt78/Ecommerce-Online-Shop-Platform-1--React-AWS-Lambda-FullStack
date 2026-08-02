@@ -1,9 +1,14 @@
-// Parent: REQ-1204, REQ-1301
+// Parent: REQ-1204, REQ-1301, REQ-1670
 // Idempotent seed script (safe to re-run — uses upsert throughout):
-//  - Product catalog from the repo's legacy data/db.json (15 products).
+//  - Product catalog from the repo's data/db.json (currently 17 books —
+//    seeded dynamically from whatever that file contains, not hardcoded).
 //  - Two fresh test accounts matching docs/DROPDOWN_TEST_CREDENTIALS_DOCS.md's
 //    own convention: test@admin.com (admin) and test@user.com (user), both "12345678".
-// tickets/reviews/activity_log intentionally start empty — no legacy source data.
+//  - Two demo coupon codes so the coupon feature (REQ-1658) is testable at
+//    Cart checkout out of the box, without an admin visiting /admin/coupons first.
+// tickets/reviews/activity_log/wishlist/stock-alerts/returns/refresh-tokens
+// intentionally start empty — no legacy source data, and correct as a blank
+// starting state (same reasoning as tickets/reviews above).
 
 import "dotenv/config";
 import fs from "fs";
@@ -129,9 +134,37 @@ async function seedProducts(): Promise<void> {
   console.log(`Seeded ${products.length} products from data/db.json`);
 }
 
+interface DemoCoupon {
+  code: string;
+  type: "percent" | "fixed";
+  value: number;
+  minOrderAmount?: number;
+}
+
+// REQ-1670: demo-only coupon codes, so a reviewer can exercise the coupon
+// feature (REQ-1658) directly from Cart checkout without needing to sign in
+// as an admin and create one first. Real coupons are still admin-managed via
+// /admin/coupons — these two are just fixture data, not special-cased code.
+const DEMO_COUPONS: DemoCoupon[] = [
+  { code: "WELCOME10", type: "percent", value: 10 },
+  { code: "SAVE5", type: "fixed", value: 5, minOrderAmount: 20 },
+];
+
+async function seedCoupons(): Promise<void> {
+  for (const coupon of DEMO_COUPONS) {
+    await prisma.coupon.upsert({
+      where: { code: coupon.code },
+      update: {},
+      create: { ...coupon, active: true },
+    });
+  }
+  console.log(`Seeded ${DEMO_COUPONS.length} demo coupons: ${DEMO_COUPONS.map((c) => c.code).join(", ")}`);
+}
+
 async function main(): Promise<void> {
   await seedUsers();
   await seedProducts();
+  await seedCoupons();
 }
 
 main()

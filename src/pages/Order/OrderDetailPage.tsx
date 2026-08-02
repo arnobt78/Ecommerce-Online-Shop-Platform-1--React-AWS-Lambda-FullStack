@@ -14,7 +14,8 @@ import { ArrowLeft, Calendar, Download, Undo2 } from "lucide-react";
 import { useTitle } from "../../hooks/useTitle";
 import { useOrderDetail } from "../../hooks/useUser";
 import { useMyReturns, useCreateReturnRequest } from "../../hooks/useReturns";
-import { Card, StatusBadge, LoadingState, ErrorState, OrderTrackingInfo, OrderTimeline, RippleButton, FormTextarea } from "../../components/ui";
+import { Card, StatusBadge, ErrorState, OrderTrackingInfo, OrderTimeline, RippleButton, FormTextarea } from "../../components/ui";
+import { OrderDetailSkeleton } from "../../components";
 import { getProductImageUrl, getProductImageKey } from "../../utils/productImage";
 import { formatPrice } from "../../utils/formatPrice";
 import { downloadOrderInvoice } from "../../services";
@@ -56,10 +57,12 @@ const OrderDetailContent = ({ orderId }: { orderId: string }) => {
 
   useTitle(order ? `Order ${order.id.slice(0, 8)}` : "Order Details");
 
-  if (isLoading) return <main><LoadingState message="Loading order details..." /></main>;
-  if (error || !order) return <main><ErrorState message={error?.message || "Order not found"} /></main>;
-
-  const itemCount = order.cartList?.reduce((sum, item) => sum + (item.quantity || 1), 0) || order.quantity || 0;
+  // REQ-1670: the back button + page title never depend on `order`, so they
+  // render on the very first paint — only the data-dependent sections below
+  // swap between a shape-matching skeleton and the real content, instead of
+  // the whole page (including this static chrome) disappearing behind a
+  // single centered spinner while the order fetch is in flight.
+  const itemCount = order ? order.cartList?.reduce((sum, item) => sum + (item.quantity || 1), 0) || order.quantity || 0 : 0;
 
   // REQ-1640: reuses the same PDF the order-confirmation email already
   // attaches — no separate invoice-storage system, generated on demand.
@@ -90,24 +93,34 @@ const OrderDetailContent = ({ orderId }: { orderId: string }) => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-medium text-gray-700 dark:text-white">Order Details</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 font-mono mt-1">{order.id}</p>
+          {order ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-mono mt-1">{order.id}</p>
+          ) : (
+            <div className="h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-1.5" />
+          )}
         </div>
-        <div className="flex items-center gap-3">
-          <StatusBadge
-            status={order.status || "pending"}
-            customLabels={{ pending: "Pending", processing: "Processing", shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled", refunded: "Refunded" }}
-          />
-          <RippleButton
-            onClick={handleDownloadInvoice}
-            disabled={isDownloadingInvoice}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download className="h-4 w-4" strokeWidth={2} />
-            {isDownloadingInvoice ? "Downloading..." : "Download Invoice"}
-          </RippleButton>
-        </div>
+        {order && (
+          <div className="flex items-center gap-3">
+            <StatusBadge
+              status={order.status || "pending"}
+              customLabels={{ pending: "Pending", processing: "Processing", shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled", refunded: "Refunded" }}
+            />
+            <RippleButton
+              onClick={handleDownloadInvoice}
+              disabled={isDownloadingInvoice}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download className="h-4 w-4" strokeWidth={2} />
+              {isDownloadingInvoice ? "Downloading..." : "Download Invoice"}
+            </RippleButton>
+          </div>
+        )}
       </div>
 
+      {isLoading && <OrderDetailSkeleton />}
+      {error && !isLoading && <ErrorState message={error.message || "Order not found"} />}
+      {!isLoading && !error && order && (
+        <>
       {/* Summary */}
       <Card className="p-4 sm:p-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -223,6 +236,8 @@ const OrderDetailContent = ({ orderId }: { orderId: string }) => {
 
       {/* Shipping & tracking (reuses the existing component from the Dashboard order card) */}
       <OrderTrackingInfo order={order} />
+        </>
+      )}
     </main>
   );
 };

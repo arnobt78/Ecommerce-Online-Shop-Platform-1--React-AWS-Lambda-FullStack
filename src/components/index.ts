@@ -5,6 +5,7 @@ export { AdminLayout } from "./Layouts/Admin";
 export { ProductCard } from "./Elements/ProductCard";
 export { ProductCardSkeleton } from "./Elements/ProductCardSkeleton";
 export { ProductDetailSkeleton } from "./Elements/ProductDetailSkeleton";
+export { OrderDetailSkeleton } from "./Elements/OrderDetailSkeleton";
 export { Rating } from "./Elements/Rating";
 export { ReviewCard } from "./Elements/ReviewCard";
 export { ReviewForm } from "./Elements/ReviewForm";

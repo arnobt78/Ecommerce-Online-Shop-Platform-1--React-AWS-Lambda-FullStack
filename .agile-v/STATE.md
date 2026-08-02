@@ -285,6 +285,13 @@ User replied "yes continue" to close out the page-redesign initiative's final tw
 - No functional, architectural, or security defects found beyond those three — refresh-token rotation, guest-checkout ownership checks, coupon server-side-only discount math, CSV RFC4180 handling, and the AI reasoning-token-budget fix (REQ-1664) all held up under this second pass.
 - `tsc`/`eslint`/build re-verified clean after the three fixes, both sides.
 
+## Nineteenth pass — second, broader pre-commit audit after REQ-1668 (REQ-1669), continued session (2026-08-02)
+
+- After REQ-1668 (Phase-9-diff-scoped audit, 3 gaps found/fixed) was committed and pushed, user asked to audit again, this time explicitly whole-codebase rather than diff-scoped, since the prior round had found real issues.
+- Widened scope beyond the 26 Phase-9 files to everything: all 18 frontend hooks (not just the 6 new ones) checked for mutation/invalidation correctness; all 18 backend route files (not just the 5 new ones) checked for auth-guard/zod coverage; a heuristic orphaned-file reference-count scan across every file in `src/` and `backend/src/`; `depcheck`/`npm audit` both sides; a full `process.env`/`import.meta.env.VITE_*` vs `.env.example` cross-check; a repo-wide `location.reload()`/CRA-`process.env`-leak sweep.
+- Result: zero new gaps found. The 3 fixes from REQ-1668 were the complete set of real issues — this pass confirms it rather than finding more. A few grep-based false positives were investigated and ruled out (hook mutation counts skewed by counting the `useMutation` import statement itself; `express.d.ts` "orphan" is a global ambient type augmentation, correctly zero-imported by design; `depcheck` flagging `tailwindcss`/`postcss`/`autoprefixer` as unused, confirmed still wired via `.cjs` config files it doesn't parse; frontend's one high `npm audit` advisory is the pre-known RSC-mode-only react-router CVE, inapplicable to this client SPA).
+- `tsc`/`eslint --max-warnings=0`/build clean both sides (re-verified, no changes needed). No commit made this pass — nothing changed in the codebase, only verification.
+
 ## File Index
 
 | File | Purpose |

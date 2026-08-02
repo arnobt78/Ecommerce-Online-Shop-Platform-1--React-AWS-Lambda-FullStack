@@ -122,6 +122,13 @@ export interface Order {
   refundId?: string | null;
   refundAmount?: number | null;
   refundedAt?: string | null;
+  // REQ-1659: guest checkout — isGuest defaults false for every pre-existing
+  // authenticated order; guestEmail is only ever set alongside isGuest=true.
+  isGuest?: boolean;
+  guestEmail?: string | null;
+  // REQ-1658: server-computed at order-creation time, never client-trusted.
+  couponCode?: string | null;
+  discountAmount?: number | null; // cents, matches refundAmount's unit
   createdAt: string;
   updatedAt: string;
 }

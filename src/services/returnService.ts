@@ -9,6 +9,15 @@ import { API_BASE_URL } from "../lib/apiBase";
 
 export type ReturnStatus = "requested" | "approved" | "rejected" | "refunded";
 
+// Shared with both OrderDetailPage (authenticated) and GuestOrderLookupPage
+// (REQ-1671) via ReturnRequestSection — one copy of the copy, not duplicated.
+export const RETURN_STATUS_LABELS: Record<ReturnStatus, string> = {
+  requested: "Return requested — awaiting review",
+  approved: "Return approved",
+  rejected: "Return request rejected",
+  refunded: "Return approved — refunded",
+};
+
 export interface ReturnRequest {
   id: string;
   orderId: string;
@@ -58,6 +67,18 @@ export async function createReturnRequest(orderId: string, reason: string): Prom
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({ reason }),
+  });
+  if (!response.ok) throw new ApiError(await extractErrorMessage(response), response.status);
+  return response.json();
+}
+
+// REQ-1671: guest-checkout counterpart — no Bearer token (a guest never has
+// one), ownership verified server-side against Order.guestEmail instead.
+export async function createGuestReturnRequest(orderId: string, reason: string, email: string): Promise<ReturnRequest> {
+  const response = await fetch(`${API_BASE_URL}/orders/${orderId}/return`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason, email }),
   });
   if (!response.ok) throw new ApiError(await extractErrorMessage(response), response.status);
   return response.json();

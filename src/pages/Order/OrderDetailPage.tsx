@@ -10,23 +10,16 @@
 
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calendar, Download, Undo2 } from "lucide-react";
+import { ArrowLeft, Calendar, Download } from "lucide-react";
 import { useTitle } from "../../hooks/useTitle";
 import { useOrderDetail } from "../../hooks/useUser";
 import { useMyReturns, useCreateReturnRequest } from "../../hooks/useReturns";
-import { Card, StatusBadge, ErrorState, OrderTrackingInfo, OrderTimeline, RippleButton, FormTextarea } from "../../components/ui";
-import { OrderDetailSkeleton } from "../../components";
+import { Card, StatusBadge, ErrorState, OrderTrackingInfo, OrderTimeline, RippleButton } from "../../components/ui";
+import { OrderDetailSkeleton, ReturnRequestSection } from "../../components";
 import { getProductImageUrl, getProductImageKey } from "../../utils/productImage";
 import { formatPrice } from "../../utils/formatPrice";
 import { downloadOrderInvoice } from "../../services";
 import { toast } from "../../lib/toast";
-
-const RETURN_STATUS_LABELS: Record<string, string> = {
-  requested: "Return requested — awaiting review",
-  approved: "Return approved",
-  rejected: "Return request rejected",
-  refunded: "Return approved — refunded",
-};
 
 function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return "Date not available";
@@ -52,8 +45,6 @@ const OrderDetailContent = ({ orderId }: { orderId: string }) => {
   const { data: myReturns = [] } = useMyReturns();
   const existingReturn = useMemo(() => myReturns.find((r) => r.orderId === orderId), [myReturns, orderId]);
   const createReturnMutation = useCreateReturnRequest();
-  const [showReturnForm, setShowReturnForm] = useState(false);
-  const [returnReason, setReturnReason] = useState("");
 
   useTitle(order ? `Order ${order.id.slice(0, 8)}` : "Order Details");
 
@@ -181,55 +172,12 @@ const OrderDetailContent = ({ orderId }: { orderId: string }) => {
       </Card>
 
       {/* REQ-1663 — customer-initiated return request, only offered once delivered */}
-      {order.status === "delivered" && (
-        <Card className="p-4 sm:p-6">
-          <h2 className="mb-3 flex items-center gap-2 text-lg font-medium text-gray-700 dark:text-white">
-            <Undo2 className="h-4 w-4 text-amber-600 dark:text-amber-400" strokeWidth={2} />
-            Return This Order
-          </h2>
-          {existingReturn ? (
-            <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 text-sm text-gray-700 dark:text-gray-300">
-              {RETURN_STATUS_LABELS[existingReturn.status] || existingReturn.status}
-              {existingReturn.adminNote && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Note: {existingReturn.adminNote}</p>}
-            </div>
-          ) : showReturnForm ? (
-            <div className="space-y-3">
-              <FormTextarea
-                value={returnReason}
-                onChange={(e) => setReturnReason(e.target.value)}
-                placeholder="Tell us why you'd like to return this order (min 10 characters)..."
-                rows={4}
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    createReturnMutation.mutate(
-                      { orderId, reason: returnReason.trim() },
-                      { onSuccess: () => setShowReturnForm(false) },
-                    )
-                  }
-                  disabled={createReturnMutation.isPending || returnReason.trim().length < 10}
-                  className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-                >
-                  {createReturnMutation.isPending ? "Submitting..." : "Submit Return Request"}
-                </button>
-                <button type="button" onClick={() => setShowReturnForm(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowReturnForm(true)}
-              className="rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              Request Return
-            </button>
-          )}
-        </Card>
-      )}
+      <ReturnRequestSection
+        orderStatus={order.status || "pending"}
+        existingReturn={existingReturn}
+        onSubmit={(reason) => createReturnMutation.mutate({ orderId, reason })}
+        isSubmitting={createReturnMutation.isPending}
+      />
 
       {/* Status/refund/tracking timeline (REQ-1617, shared with the admin order detail page — REQ-1646) */}
       <OrderTimeline createdAt={order.createdAt} timeline={order.timeline} />

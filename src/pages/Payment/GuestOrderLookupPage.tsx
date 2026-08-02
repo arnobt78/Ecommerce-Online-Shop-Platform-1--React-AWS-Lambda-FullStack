@@ -10,8 +10,10 @@ import type { FormEvent } from "react";
 import { Search, Package } from "lucide-react";
 import { useTitle } from "../../hooks/useTitle";
 import { useGuestOrder } from "../../hooks/useGuestOrder";
+import { useCreateGuestReturnRequest } from "../../hooks/useReturns";
 import { formatPrice } from "../../utils/formatPrice";
 import { Card, PageHeader, StatusBadge, LoadingState, ErrorState, OrderTimeline } from "../../components/ui";
+import { ReturnRequestSection } from "../../components";
 
 export const GuestOrderLookupPage = () => {
   useTitle("Track Your Order");
@@ -20,6 +22,7 @@ export const GuestOrderLookupPage = () => {
   const [submitted, setSubmitted] = useState(false);
 
   const { data: order, isLoading, error } = useGuestOrder(orderId.trim(), email.trim(), submitted);
+  const createGuestReturnMutation = useCreateGuestReturnRequest();
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -117,6 +120,20 @@ export const GuestOrderLookupPage = () => {
               </p>
             )}
           </Card>
+
+          {/* REQ-1671 — guest-checkout counterpart of OrderDetailPage's return request.
+              Verifies against order.guestEmail (the value the lookup itself already
+              confirmed), not the live `email` input — editing that field after a
+              successful lookup (without re-submitting) must not silently break the
+              return request with a stale/edited email. */}
+          <div className="mt-6">
+            <ReturnRequestSection
+              orderStatus={order.status || "pending"}
+              existingReturn={order.returnRequest}
+              onSubmit={(reason) => createGuestReturnMutation.mutate({ orderId: order.id, reason, email: order.guestEmail || email.trim() })}
+              isSubmitting={createGuestReturnMutation.isPending}
+            />
+          </div>
 
           <div className="mt-6">
             <OrderTimeline createdAt={order.createdAt} timeline={order.timeline} />

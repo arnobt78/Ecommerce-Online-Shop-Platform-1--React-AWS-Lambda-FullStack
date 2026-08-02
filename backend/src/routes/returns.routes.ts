@@ -1,13 +1,17 @@
 // Parent: REQ-1663 — customer-initiated post-delivery return request, admin
 // approve/reject. Customer routes ownership-checked via req.user.id; admin
-// routes gated by requireAdmin.
+// routes gated by requireAdmin. REQ-1671: create-return also accepts a guest
+// checkout order (optionalAuth + email verification), same pattern as the
+// guest order lookup itself.
 
 import express, { type Request, type Response } from "express";
 import { successResponse, errorResponse } from "../lib/response";
-import { requireAuth, requireAdmin } from "../lib/auth";
+import { requireAuth, requireAdmin, optionalAuth } from "../lib/auth";
+import { publicWriteLimiter } from "../lib/rateLimit";
 import { logActivity } from "../services/activityLog.service";
 import * as returnsService from "../services/returns.service";
 import { createReturnRequestSchema } from "../services/returns.service";
+import { getOrderById } from "../services/orders.service";
 
 export const publicRouter = express.Router();
 export const adminRouter = express.Router();
@@ -23,23 +27,40 @@ publicRouter.get("/returns", requireAuth, async (req: Request, res: Response) =>
   }
 });
 
-// POST /orders/:orderId/return — customer requests a return for a delivered order
-publicRouter.post("/orders/:orderId/return", requireAuth, async (req: Request, res: Response) => {
+// POST /orders/:orderId/return — customer requests a return for a delivered
+// order. REQ-1671: optionalAuth so a guest checkout order can request one
+// too — a guest has no req.user, so ownership is instead verified against
+// Order.guestEmail (same reasoning as the guest order-lookup route).
+publicRouter.post("/orders/:orderId/return", publicWriteLimiter, optionalAuth, async (req: Request, res: Response) => {
   try {
     const parsed = createReturnRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       return errorResponse(res, parsed.error.issues[0]?.message || "Invalid request", 400);
     }
 
-    const returnRequest = await returnsService.createReturnRequest(req.user!.id, req.params.orderId!, parsed.data.reason);
+    const orderId = req.params.orderId!;
+    let effectiveUserId: string;
+    if (req.user) {
+      effectiveUserId = req.user.id;
+    } else {
+      const order = await getOrderById(orderId);
+      if (!order) return errorResponse(res, "Order not found", 404);
+      const email = parsed.data.email;
+      if (!order.isGuest || !email || (order.guestEmail || "").toLowerCase() !== email.toLowerCase()) {
+        return errorResponse(res, "Order not found", 404);
+      }
+      effectiveUserId = order.userId;
+    }
+
+    const returnRequest = await returnsService.createReturnRequest(effectiveUserId, orderId, parsed.data.reason);
 
     logActivity({
-      userId: req.user!.id,
-      userEmail: req.user!.email,
-      userName: req.user!.name,
+      userId: effectiveUserId,
+      userEmail: req.user?.email || parsed.data.email,
+      userName: req.user?.name || "Guest",
       action: "create",
       entityType: "order",
-      entityId: req.params.orderId!,
+      entityId: orderId,
       details: { returnRequestId: returnRequest.id, reason: parsed.data.reason },
     });
 

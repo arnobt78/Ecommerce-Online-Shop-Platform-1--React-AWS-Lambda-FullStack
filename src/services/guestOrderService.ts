@@ -7,9 +7,13 @@
 import { ApiError } from "./apiError";
 import { API_BASE_URL } from "../lib/apiBase";
 import type { Order, ActivityLog } from "../types";
+import type { ReturnRequest } from "./returnService";
 
 export interface GuestOrderResult extends Order {
   timeline: ActivityLog[];
+  // REQ-1671: this order's own return request, if any — embedded here since
+  // a guest has no persistent identity to list "their" returns by.
+  returnRequest: ReturnRequest | null;
 }
 
 export async function getGuestOrder(orderId: string, email: string): Promise<GuestOrderResult> {

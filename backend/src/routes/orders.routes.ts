@@ -11,6 +11,7 @@ import { paymentLimiter } from "../lib/rateLimit";
 import { logActivity, getOrderActivityTimeline } from "../services/activityLog.service";
 import * as ordersService from "../services/orders.service";
 import { createOrderSchema } from "../services/orders.service";
+import { getReturnRequestByOrderId } from "../services/returns.service";
 import { generateShippoLabel } from "../services/shipping.service";
 import { generateInvoicePdf } from "../services/invoice.service";
 import { toCsv } from "../lib/csv";
@@ -73,8 +74,12 @@ publicRouter.get("/orders/guest/:orderId", paymentLimiter, async (req: Request, 
       return errorResponse(res, "Order not found", 404);
     }
 
-    const timeline = await getOrderActivityTimeline(order.id);
-    return successResponse(res, { ...order, timeline });
+    // REQ-1671: embed this order's return status directly — a guest has no
+    // persistent identity to list "their" returns by (unlike the
+    // authenticated GET /returns), so it rides along with the single order
+    // lookup response instead of needing a separate endpoint.
+    const [timeline, returnRequest] = await Promise.all([getOrderActivityTimeline(order.id), getReturnRequestByOrderId(order.id)]);
+    return successResponse(res, { ...order, timeline, returnRequest });
   } catch (error) {
     console.error("Guest order lookup error:", error);
     return errorResponse(res, { message: error instanceof Error ? error.message : "Internal server error" }, 500);

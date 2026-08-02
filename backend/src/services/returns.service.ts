@@ -9,6 +9,10 @@ import { getOrderById, refundOrderPayment } from "./orders.service";
 
 export const createReturnRequestSchema = z.object({
   reason: z.string().min(10, "Please describe the reason for your return (at least 10 characters)").max(1000),
+  // REQ-1671: present only for a guest-checkout return request, verified
+  // against Order.guestEmail by the route before this reaches the service —
+  // logged-in requests never send this (ownership comes from the JWT).
+  email: z.string().email().optional(),
 });
 export type CreateReturnRequestInput = z.infer<typeof createReturnRequestSchema>;
 
@@ -44,6 +48,13 @@ export async function getAllReturnRequests(): Promise<ReturnRequest[]> {
 
 export async function getReturnRequestById(id: string): Promise<ReturnRequest | null> {
   return prisma.returnRequest.findUnique({ where: { id } });
+}
+
+// REQ-1671: a guest has no persistent identity to list "their" returns by
+// (unlike getReturnRequestsByUserId) — the guest order-lookup route embeds
+// this single order's return status directly instead.
+export async function getReturnRequestByOrderId(orderId: string): Promise<ReturnRequest | null> {
+  return prisma.returnRequest.findFirst({ where: { orderId }, orderBy: { createdAt: "desc" } });
 }
 
 export interface ApproveReturnResult {

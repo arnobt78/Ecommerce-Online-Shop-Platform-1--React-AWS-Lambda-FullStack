@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient, type UseQueryResult, type UseMut
 import {
   getMyReturns,
   createReturnRequest,
+  createGuestReturnRequest,
   getAllReturns,
   approveReturn,
   rejectReturn,
@@ -45,6 +46,31 @@ export function useCreateReturnRequest(): UseMutationResult<ReturnRequest, Error
   });
 }
 
+interface CreateGuestReturnVariables {
+  orderId: string;
+  reason: string;
+  email: string;
+}
+
+// REQ-1671: guest-checkout counterpart of useCreateReturnRequest — invalidates
+// the guest-order query (prefix match, regardless of the specific orderId/email
+// args it was fetched with) so the lookup page shows the new "requested"
+// status immediately, no page refresh.
+export function useCreateGuestReturnRequest(): UseMutationResult<ReturnRequest, Error, CreateGuestReturnVariables> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, reason, email }: CreateGuestReturnVariables) => createGuestReturnRequest(orderId, reason, email),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["guest-order"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-returns"] });
+      toast.success("Return request submitted", { closeButton: true, position: "bottom-right" });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to submit return request", { closeButton: true, position: "bottom-right" });
+    },
+  });
+}
+
 export function useAdminReturns(enabled = true): UseQueryResult<ReturnRequest[], Error> {
   const hasToken = typeof window !== "undefined" && !!sessionStorage.getItem("token");
   return useQuery({
@@ -71,6 +97,7 @@ export function useApproveReturn(): UseMutationResult<ReturnRequest, Error, Retu
       queryClient.invalidateQueries({ queryKey: ["admin-order", data.orderId] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["order", data.orderId] });
+      queryClient.invalidateQueries({ queryKey: ["guest-order"] }); // REQ-1671: could be a guest's own order
       queryClient.invalidateQueries({ queryKey: ["admin-products"], refetchType: "active" }); // stock restored
       toast.success("Return approved and refunded", { closeButton: true, position: "bottom-right" });
     },
@@ -86,6 +113,7 @@ export function useRejectReturn(): UseMutationResult<ReturnRequest, Error, Retur
     mutationFn: ({ id, adminNote }: ReturnActionVariables) => rejectReturn(id, adminNote),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-returns"] });
+      queryClient.invalidateQueries({ queryKey: ["guest-order"] }); // REQ-1671: could be a guest's own order
       toast.success("Return request rejected", { closeButton: true, position: "bottom-right" });
     },
     onError: (error) => {

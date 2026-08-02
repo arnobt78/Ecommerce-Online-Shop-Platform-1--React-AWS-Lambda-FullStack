@@ -8,10 +8,18 @@ import * as wishlistService from "../services/wishlist.service";
 
 const router = express.Router();
 
-router.use(requireAuth);
+// REQ-1671: requireAuth must be scoped to each route below, not applied via
+// a blanket `router.use(requireAuth)` — this router is mounted in app.ts
+// with no path prefix (its own routes carry the full "/wishlist" path), so
+// an unscoped router.use() would run for EVERY request that reaches this
+// router in the chain, not just "/wishlist" ones — silently 401-blocking
+// every route mounted after it (stock-alerts, coupon validation, the Shippo
+// webhook, guest returns) for any unauthenticated caller. This was a real,
+// live bug: the Shippo webhook never carries a Bearer token, so real
+// tracking-update webhooks were being rejected in any deployment.
 
 // GET /wishlist
-router.get("/wishlist", async (req: Request, res: Response) => {
+router.get("/wishlist", requireAuth, async (req: Request, res: Response) => {
   try {
     const wishlist = await wishlistService.getWishlistByUserId(req.user!.id);
     return successResponse(res, wishlist);
@@ -22,7 +30,7 @@ router.get("/wishlist", async (req: Request, res: Response) => {
 });
 
 // POST /wishlist { productId }
-router.post("/wishlist", async (req: Request, res: Response) => {
+router.post("/wishlist", requireAuth, async (req: Request, res: Response) => {
   try {
     const { productId } = (req.body || {}) as { productId?: unknown };
     if (!productId || typeof productId !== "string") {
@@ -39,7 +47,7 @@ router.post("/wishlist", async (req: Request, res: Response) => {
 });
 
 // DELETE /wishlist/:productId
-router.delete("/wishlist/:productId", async (req: Request, res: Response) => {
+router.delete("/wishlist/:productId", requireAuth, async (req: Request, res: Response) => {
   try {
     await wishlistService.removeFromWishlist(req.user!.id, req.params.productId!);
     return successResponse(res, { message: "Removed from wishlist" });
